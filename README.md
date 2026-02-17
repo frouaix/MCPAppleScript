@@ -11,17 +11,27 @@ MCP-AppleScript provides a secure bridge between the [Model Context Protocol](ht
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `applescript.ping` | Health check — returns server version |
-| `applescript.list_apps` | List configured apps and their policy status |
-| `applescript.get_mode` | Get current operation mode and enabled tools |
-| `applescript.set_mode` | Change operation mode (readonly/create/full) |
-| `notes.create_note` | Create a new note in Apple Notes |
-| `calendar.create_event` | Create an event in Apple Calendar |
-| `mail.compose_draft` | Compose an email draft in Apple Mail |
-| `applescript.run_template` | Execute a registered template by ID (policy-gated) |
-| `applescript.run_script` | Execute raw AppleScript (full mode only, requires confirmation) |
+All 10 Apple apps are accessed through generic `app.*` tools with an `app` parameter:
+
+| Tool | Mode | Description |
+|------|------|-------------|
+| `applescript.ping` | readonly | Health check — returns server version and supported apps |
+| `applescript.get_mode` | readonly | Get current operation mode and enabled tools |
+| `applescript.set_mode` | readonly | Change operation mode (readonly/create/full) |
+| `app.list_containers` | readonly | List containers (folders, calendars, mailboxes, playlists, etc.) |
+| `app.list` | readonly | List items in a container with pagination |
+| `app.get` | readonly | Get a single item by ID |
+| `app.search` | readonly | Search/filter items |
+| `app.create` | create | Create a new item |
+| `app.action` | create | App-specific actions (send, play, complete, do_javascript, etc.) |
+| `applescript.run_template` | create | Execute a registered template by ID (policy-gated) |
+| `app.update` | full | Update an item (confirmation required) |
+| `app.delete` | full | Delete an item (confirmation required) |
+| `applescript.run_script` | full | Execute raw AppleScript (confirmation required) |
+
+### Supported Apps
+
+Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, Safari
 
 ## Operation Modes
 
@@ -29,15 +39,15 @@ The server starts in **readonly** mode by default. Use `applescript.set_mode` to
 
 | Mode | Description | Available Tools |
 |------|-------------|-----------------|
-| **readonly** | No creation, editing, or deleting | ping, list_apps, get_mode, set_mode |
-| **create** | Readonly + creation allowed | + notes, calendar, mail, run_template |
-| **full** | All operations, potentially destructive | + run_script (requires confirmation) |
+| **readonly** | No creation, editing, or deleting | ping, get_mode, set_mode, app.list/get/search/list_containers |
+| **create** | Readonly + creation allowed | + app.create, app.action, run_template |
+| **full** | All operations, potentially destructive | + app.update, app.delete, run_script (requires confirmation) |
 
 When the mode changes, the client is notified via `notifications/tools/list_changed` and will only see tools available in the current mode.
 
 ### Destructive Action Confirmation
 
-In **full** mode, destructive tools (like `run_script`) require user confirmation:
+In **full** mode, destructive tools (`app.update`, `app.delete`, `run_script`) require user confirmation:
 1. If the MCP client supports **elicitation**, a confirmation dialog is shown
 2. Otherwise, a **confirmation token** is returned — pass it back in a second call to confirm
 
@@ -65,9 +75,11 @@ Download the latest `.dmg` from [GitHub Releases](https://github.com/frouaix/MCP
    {
      "defaultMode": "readonly",
      "apps": {
-       "com.apple.Notes": { "enabled": true, "allowedTools": ["notes.create_note"] },
-       "com.apple.iCal": { "enabled": true, "allowedTools": ["calendar.create_event"] },
-       "com.apple.mail": { "enabled": true, "allowedTools": ["mail.compose_draft"] }
+       "com.apple.Notes": { "enabled": true },
+       "com.apple.iCal": { "enabled": true },
+       "com.apple.reminders": { "enabled": true },
+       "com.apple.mail": { "enabled": true },
+       "com.apple.Contacts": { "enabled": true }
      }
    }
    EOF
@@ -126,23 +138,21 @@ Configuration lives at `~/.config/applescript-mcp/config.json` (override via `AP
   "defaultTimeoutMs": 12000,
   "defaultMode": "readonly",
   "modes": {
-    "readonly": ["applescript.ping", "applescript.list_apps", "applescript.get_mode", "applescript.set_mode"],
-    "create": ["notes.create_note", "calendar.create_event", "mail.compose_draft", "applescript.run_template"],
-    "full": ["applescript.run_script"]
+    "readonly": ["applescript.ping", "applescript.get_mode", "applescript.set_mode", "app.list_containers", "app.list", "app.get", "app.search"],
+    "create": ["app.create", "app.action", "applescript.run_template"],
+    "full": ["app.update", "app.delete", "applescript.run_script"]
   },
   "apps": {
-    "com.apple.Notes": {
-      "enabled": true,
-      "allowedTools": ["notes.create_note", "applescript.run_template"]
-    },
-    "com.apple.iCal": {
-      "enabled": true,
-      "allowedTools": ["calendar.create_event"]
-    },
-    "com.apple.mail": {
-      "enabled": true,
-      "allowedTools": ["mail.compose_draft"]
-    }
+    "com.apple.Notes": { "enabled": true },
+    "com.apple.iCal": { "enabled": true },
+    "com.apple.reminders": { "enabled": true },
+    "com.apple.mail": { "enabled": true },
+    "com.apple.Contacts": { "enabled": true },
+    "com.apple.MobileSMS": { "enabled": true },
+    "com.apple.Photos": { "enabled": true },
+    "com.apple.Music": { "enabled": true },
+    "com.apple.finder": { "enabled": true },
+    "com.apple.Safari": { "enabled": true }
   },
   "runScript": {
     "enabled": false,
@@ -173,7 +183,7 @@ On first use, macOS will prompt for automation permissions:
 
 1. Open **System Settings** → **Privacy & Security** → **Automation**
 2. Find your terminal or the executor binary
-3. Enable permissions for the apps you want to automate (Notes, Calendar, Mail)
+3. Enable permissions for the apps you want to automate (Notes, Calendar, Reminders, Mail, Contacts, etc.)
 
 If you see `AUTOMATION_DENIED` errors, check these permissions.
 
@@ -186,7 +196,7 @@ TypeScript MCP Server
     ↕ JSON over stdin/stdout
 Swift Executor (applescript-executor)
     ↕ Apple Events
-macOS Apps (Notes, Calendar, Mail)
+macOS Apps (Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, Safari)
 ```
 
 The Node process is the only MCP-facing component. Swift is a helper invoked locally for each tool call. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
@@ -200,7 +210,7 @@ pnpm install
 # Build everything
 pnpm build
 
-# Run unit tests (73 tests)
+# Run unit tests (150 tests)
 pnpm test:unit
 
 # Run integration tests (4 tests, requires macOS)
@@ -246,6 +256,7 @@ MCPAppleScript/
         index.ts         # Stdio entrypoint
         server.ts        # MCP server + tool registration
         sea.ts           # SEA binary support (executor extraction)
+        adapters/        # ResourceAdapter pattern: per-app adapters (10 apps)
         config/          # Configuration loading + Zod schemas
         mode/            # Operation mode manager + confirmation
         policy/          # Allowlist/denylist enforcement
@@ -254,7 +265,8 @@ MCPAppleScript/
     executor-swift/      # Swift executor CLI
       Sources/Executor/
         main.swift       # JSON dispatcher
-        AppleScriptRunner.swift  # NSAppleScript execution
+        AppleScriptRunner.swift  # Template dispatch to per-app modules
+        {App}Templates.swift     # Per-app AppleScript templates (10 files)
         AppTargeting.swift       # Bundle ID handling
         Errors.swift     # Error code mapping
         JsonIO.swift     # Stdin/stdout JSON I/O
