@@ -70,81 +70,18 @@ enum AppleScriptRunner {
     }
 
     /// Builds an AppleScript string from a template identifier and parameters.
+    /// Dispatches to per-app template modules based on the template ID prefix.
     private static func buildTemplateScript(templateId: String, bundleId: String, parameters: [String: Any]) throws -> String {
-        switch templateId {
-        case "notes.create_note.v1":
-            return try buildNotesCreateScript(bundleId: bundleId, parameters: parameters)
-        case "calendar.create_event.v1":
-            return try buildCalendarCreateScript(bundleId: bundleId, parameters: parameters)
-        case "mail.compose_draft.v1":
-            return try buildMailComposeScript(bundleId: bundleId, parameters: parameters)
+        let prefix = templateId.split(separator: ".").first.map(String.init) ?? ""
+        switch prefix {
+        case "notes":
+            return try NotesTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "calendar":
+            return try CalendarTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "reminders":
+            return try RemindersTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         default:
-            throw ExecutorError.invalidRequest("Unknown template: \(templateId)")
+            throw ExecutorError.invalidRequest("Unknown template prefix: \(prefix) (template: \(templateId))")
         }
-    }
-
-    // MARK: - Template Builders
-
-    private static func buildNotesCreateScript(bundleId: String, parameters: [String: Any]) throws -> String {
-        let title = escapeAppleScript(parameters["title"] as? String ?? "Untitled")
-        let body = escapeAppleScript(parameters["body"] as? String ?? "")
-
-        return """
-        tell application id "\(bundleId)"
-            activate
-            set newNote to make new note with properties {name:"\(title)", body:"\(body)"}
-            return name of newNote
-        end tell
-        """
-    }
-
-    private static func buildCalendarCreateScript(bundleId: String, parameters: [String: Any]) throws -> String {
-        guard let title = parameters["title"] as? String else {
-            throw ExecutorError.invalidRequest("calendar.create_event requires 'title' parameter")
-        }
-        guard let startStr = parameters["start"] as? String else {
-            throw ExecutorError.invalidRequest("calendar.create_event requires 'start' parameter")
-        }
-        guard let endStr = parameters["end"] as? String else {
-            throw ExecutorError.invalidRequest("calendar.create_event requires 'end' parameter")
-        }
-        let calendarName = escapeAppleScript(parameters["calendarName"] as? String ?? "Calendar")
-        let location = escapeAppleScript(parameters["location"] as? String ?? "")
-        let notes = escapeAppleScript(parameters["notes"] as? String ?? "")
-
-        return """
-        tell application id "\(bundleId)"
-            set targetCalendar to first calendar whose name is "\(calendarName)"
-            set startDate to date "\(escapeAppleScript(startStr))"
-            set endDate to date "\(escapeAppleScript(endStr))"
-            set newEvent to make new event at end of events of targetCalendar with properties {summary:"\(escapeAppleScript(title))", start date:startDate, end date:endDate, location:"\(location)", description:"\(notes)"}
-            return uid of newEvent
-        end tell
-        """
-    }
-
-    private static func buildMailComposeScript(bundleId: String, parameters: [String: Any]) throws -> String {
-        guard let to = parameters["to"] as? String else {
-            throw ExecutorError.invalidRequest("mail.compose_draft requires 'to' parameter")
-        }
-        let subject = escapeAppleScript(parameters["subject"] as? String ?? "")
-        let body = escapeAppleScript(parameters["body"] as? String ?? "")
-
-        return """
-        tell application id "\(bundleId)"
-            set newMessage to make new outgoing message with properties {subject:"\(subject)", content:"\(body)", visible:true}
-            tell newMessage
-                make new to recipient at end of to recipients with properties {address:"\(escapeAppleScript(to))"}
-            end tell
-            return subject of newMessage
-        end tell
-        """
-    }
-
-    /// Escapes special characters for safe use in AppleScript strings.
-    private static func escapeAppleScript(_ input: String) -> String {
-        return input
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }

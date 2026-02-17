@@ -13,8 +13,14 @@ import {
   buildToolModeMap,
 } from "./mode/mode.js";
 import { ConfirmationManager } from "./mode/confirmation.js";
+import {
+  AppRegistry,
+  NotesAdapter,
+  CalendarAdapter,
+  RemindersAdapter,
+} from "./adapters/index.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 export interface ServerDeps {
   config: Config;
@@ -27,6 +33,12 @@ export function createServer(deps: ServerDeps): McpServer {
 
   const modeManager = new ModeManager(config.defaultMode, buildToolModeMap(config.modes));
   const confirmation = new ConfirmationManager();
+
+  // Build app registry with all supported adapters
+  const appRegistry = new AppRegistry();
+  appRegistry.register(new NotesAdapter());
+  appRegistry.register(new CalendarAdapter());
+  appRegistry.register(new RemindersAdapter());
 
   const server = new McpServer(
     { name: "mcp-applescript", version: VERSION },
@@ -43,7 +55,6 @@ export function createServer(deps: ServerDeps): McpServer {
 
   function registerTool(name: string, tool: RegisteredTool): void {
     registeredTools.set(name, tool);
-    // Disable tools not allowed in current mode at registration time
     if (!modeManager.isToolAllowedInMode(name, modeManager.getMode())) {
       tool.disable();
     }
@@ -59,6 +70,41 @@ export function createServer(deps: ServerDeps): McpServer {
     }
   }
 
+  /** Execute a template via the Swift executor and return MCP tool result. */
+  async function executeTemplate(
+    templateId: string,
+    bundleId: string,
+    parameters: Record<string, unknown>,
+    dryRun: boolean,
+  ) {
+    const request: ExecutorRequest = {
+      requestId: randomUUID(),
+      bundleId,
+      mode: "template",
+      templateId,
+      parameters,
+      timeoutMs: config.defaultTimeoutMs,
+      dryRun,
+    };
+    const response = await runExecutor(request, executorOptions);
+    if (!response.ok) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${response.error.message}` }],
+        isError: true as const,
+      };
+    }
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(response.result) }],
+    };
+  }
+
+  // Shared schema fragments
+  const dryRunParam = z.boolean().optional().describe("If true, return the generated script without executing it");
+  const appNames = appRegistry.listApps().map((a) => a.name);
+  const appParam = z.enum(appNames as [string, ...string[]]).describe(
+    `Target app: ${appNames.join(", ")}`
+  );
+
   // --- applescript.ping ---
   registerTool(
     "applescript.ping",
@@ -67,28 +113,8 @@ export function createServer(deps: ServerDeps): McpServer {
       "Check if the MCP-AppleScript server is running",
       { readOnlyHint: true },
       async () => ({
-        content: [{ type: "text", text: JSON.stringify({ ok: true, version: VERSION }) }],
+        content: [{ type: "text", text: JSON.stringify({ ok: true, version: VERSION, apps: appNames }) }],
       })
-    )
-  );
-
-  // --- applescript.list_apps ---
-  registerTool(
-    "applescript.list_apps",
-    server.tool(
-      "applescript.list_apps",
-      "List configured apps and their policy status",
-      { readOnlyHint: true },
-      async () => {
-        const apps = policy.getConfiguredApps().map((a) => ({
-          bundleId: a.bundleId,
-          enabled: a.config.enabled,
-          allowedTools: a.config.allowedTools,
-        }));
-        return {
-          content: [{ type: "text", text: JSON.stringify({ apps }, null, 2) }],
-        };
-      }
     )
   );
 
@@ -129,7 +155,6 @@ export function createServer(deps: ServerDeps): McpServer {
       async ({ mode: newMode }) => {
         const { oldMode } = modeManager.setMode(newMode as OperationMode);
         applyMode();
-        // Notify client that tool list changed
         server.sendToolListChanged();
 
         const enabledTools = modeManager.getEnabledTools();
@@ -152,155 +177,198 @@ export function createServer(deps: ServerDeps): McpServer {
     )
   );
 
-  // Shared schema fragments
-  const dryRunParam = z.boolean().optional().describe("If true, return the generated script without executing it");
-  const MAX_TEXT = 10000;
-  const MAX_TITLE = 500;
-
-  // --- notes.create_note ---
+  // --- app.list_containers ---
   registerTool(
-    "notes.create_note",
+    "app.list_containers",
     server.tool(
-      "notes.create_note",
-      "Create a new note in Apple Notes",
+      "app.list_containers",
+      "List containers (folders, calendars, lists, etc.) for an Apple app",
       {
-        title: z.string().max(MAX_TITLE).describe("Title of the note"),
-        body: z.string().max(MAX_TEXT).describe("Body content"),
+        app: appParam,
         dryRun: dryRunParam,
       },
-      { readOnlyHint: false, destructiveHint: false },
-      async ({ title, body, dryRun }) => {
-        const bundleId = "com.apple.Notes";
-        policy.assertAllowed({ toolName: "notes.create_note", bundleId });
-
-        const request: ExecutorRequest = {
-          requestId: randomUUID(),
-          bundleId,
-          mode: "template",
-          templateId: "notes.create_note.v1",
-          parameters: { title, body },
-          timeoutMs: config.defaultTimeoutMs,
-          dryRun: dryRun ?? false,
-        };
-
-        const response = await runExecutor(request, executorOptions);
-        if (!response.ok) {
-          return {
-            content: [{ type: "text", text: `Error: ${response.error.message}` }],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            { type: "text", text: `Created note "${title}"` },
-            { type: "text", text: JSON.stringify(response.result) },
-          ],
-        };
+      { readOnlyHint: true },
+      async ({ app, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.list_containers", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.listContainers();
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
   );
 
-  // --- calendar.create_event ---
+  // --- app.list ---
   registerTool(
-    "calendar.create_event",
+    "app.list",
     server.tool(
-      "calendar.create_event",
-      "Create a new event in Apple Calendar",
+      "app.list",
+      "List items (notes, events, reminders, etc.) in an Apple app, optionally within a container",
       {
-        title: z.string().max(MAX_TITLE).describe("Event title"),
-        start: z.string().max(100).describe("Start date/time (ISO 8601 or natural language)"),
-        end: z.string().max(100).describe("End date/time (ISO 8601 or natural language)"),
-        calendarName: z.string().max(200).optional().describe("Calendar name (default: Calendar)"),
-        location: z.string().max(500).optional().describe("Event location"),
-        notes: z.string().max(MAX_TEXT).optional().describe("Event notes"),
+        app: appParam,
+        containerId: z.string().max(500).optional().describe("Container ID to list items from (e.g. folder ID, calendar ID)"),
+        limit: z.number().int().min(1).max(200).optional().describe("Max items to return (default: 50)"),
+        offset: z.number().int().min(0).optional().describe("Offset for pagination (default: 0)"),
         dryRun: dryRunParam,
       },
-      { readOnlyHint: false, destructiveHint: false },
-      async ({ title, start, end, calendarName, location, notes, dryRun }) => {
-        const bundleId = "com.apple.iCal";
-        policy.assertAllowed({ toolName: "calendar.create_event", bundleId });
-
-        const request: ExecutorRequest = {
-          requestId: randomUUID(),
-          bundleId,
-          mode: "template",
-          templateId: "calendar.create_event.v1",
-          parameters: {
-            title,
-            start,
-            end,
-            calendarName: calendarName ?? "Calendar",
-            location: location ?? "",
-            notes: notes ?? "",
-          },
-          timeoutMs: config.defaultTimeoutMs,
-          dryRun: dryRun ?? false,
-        };
-
-        const response = await runExecutor(request, executorOptions);
-        if (!response.ok) {
-          return {
-            content: [{ type: "text", text: `Error: ${response.error.message}` }],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            { type: "text", text: `Created event "${title}" from ${start} to ${end}` },
-            { type: "text", text: JSON.stringify(response.result) },
-          ],
-        };
+      { readOnlyHint: true },
+      async ({ app, containerId, limit, offset, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.list", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.list({ containerId, limit, offset });
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
   );
 
-  // --- mail.compose_draft ---
+  // --- app.get ---
   registerTool(
-    "mail.compose_draft",
+    "app.get",
     server.tool(
-      "mail.compose_draft",
-      "Compose a new email draft in Apple Mail",
+      "app.get",
+      "Get a single item by ID from an Apple app",
       {
-        to: z.string().max(500).describe("Recipient email address"),
-        subject: z.string().max(MAX_TITLE).optional().describe("Email subject"),
-        body: z.string().max(MAX_TEXT).optional().describe("Email body"),
+        app: appParam,
+        id: z.string().max(500).describe("Item ID"),
+        dryRun: dryRunParam,
+      },
+      { readOnlyHint: true },
+      async ({ app, id, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.get", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.get(id);
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
+      }
+    )
+  );
+
+  // --- app.search ---
+  registerTool(
+    "app.search",
+    server.tool(
+      "app.search",
+      "Search for items in an Apple app",
+      {
+        app: appParam,
+        query: z.string().max(500).describe("Search query"),
+        containerId: z.string().max(500).optional().describe("Limit search to a specific container"),
+        limit: z.number().int().min(1).max(200).optional().describe("Max results (default: 20)"),
+        dryRun: dryRunParam,
+      },
+      { readOnlyHint: true },
+      async ({ app, query, containerId, limit, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.search", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.search({ query, containerId, limit });
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
+      }
+    )
+  );
+
+  // --- app.create ---
+  registerTool(
+    "app.create",
+    server.tool(
+      "app.create",
+      "Create a new item in an Apple app (requires create mode)",
+      {
+        app: appParam,
+        containerId: z.string().max(500).optional().describe("Container to create in (e.g. folder name, calendar name, list name)"),
+        properties: z.record(z.unknown()).describe("Item properties (app-specific: title, body, startDate, etc.)"),
         dryRun: dryRunParam,
       },
       { readOnlyHint: false, destructiveHint: false },
-      async ({ to, subject, body, dryRun }) => {
-        const bundleId = "com.apple.mail";
-        policy.assertAllowed({ toolName: "mail.compose_draft", bundleId });
+      async ({ app, containerId, properties, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.create", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.create({ containerId, properties });
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
+      }
+    )
+  );
 
-        const request: ExecutorRequest = {
-          requestId: randomUUID(),
-          bundleId,
-          mode: "template",
-          templateId: "mail.compose_draft.v1",
-          parameters: {
-            to,
-            subject: subject ?? "",
-            body: body ?? "",
-          },
-          timeoutMs: config.defaultTimeoutMs,
-          dryRun: dryRun ?? false,
-        };
+  // --- app.update ---
+  registerTool(
+    "app.update",
+    server.tool(
+      "app.update",
+      "Update an existing item in an Apple app (requires full mode, confirmation required)",
+      {
+        app: appParam,
+        id: z.string().max(500).describe("Item ID to update"),
+        properties: z.record(z.unknown()).describe("Properties to update"),
+        confirmationToken: z.string().optional().describe("Confirmation token from a previous call"),
+        dryRun: dryRunParam,
+      },
+      { readOnlyHint: false, destructiveHint: true },
+      async ({ app, id, properties, confirmationToken, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.update", bundleId: adapter.info.bundleId });
 
-        const response = await runExecutor(request, executorOptions);
-        if (!response.ok) {
-          return {
-            content: [{ type: "text", text: `Error: ${response.error.message}` }],
-            isError: true,
-          };
+        const confirmResult = await confirmation.requestConfirmation(
+          "app.update",
+          `Update ${adapter.info.itemType} "${id}" in ${adapter.info.displayName}`,
+          confirmationToken
+        );
+        if (!confirmResult.confirmed) {
+          return { content: [{ type: "text" as const, text: confirmResult.message }] };
         }
 
-        return {
-          content: [
-            { type: "text", text: `Created email draft to ${to}` },
-            { type: "text", text: JSON.stringify(response.result) },
-          ],
-        };
+        const { templateId, parameters } = adapter.update({ id, properties });
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
+      }
+    )
+  );
+
+  // --- app.delete ---
+  registerTool(
+    "app.delete",
+    server.tool(
+      "app.delete",
+      "Delete an item from an Apple app (requires full mode, confirmation required)",
+      {
+        app: appParam,
+        id: z.string().max(500).describe("Item ID to delete"),
+        confirmationToken: z.string().optional().describe("Confirmation token from a previous call"),
+        dryRun: dryRunParam,
+      },
+      { readOnlyHint: false, destructiveHint: true },
+      async ({ app, id, confirmationToken, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.delete", bundleId: adapter.info.bundleId });
+
+        const confirmResult = await confirmation.requestConfirmation(
+          "app.delete",
+          `Delete ${adapter.info.itemType} "${id}" from ${adapter.info.displayName}`,
+          confirmationToken
+        );
+        if (!confirmResult.confirmed) {
+          return { content: [{ type: "text" as const, text: confirmResult.message }] };
+        }
+
+        const { templateId, parameters } = adapter.delete(id);
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
+      }
+    )
+  );
+
+  // --- app.action ---
+  registerTool(
+    "app.action",
+    server.tool(
+      "app.action",
+      "Perform an app-specific action (e.g. show, complete, send)",
+      {
+        app: appParam,
+        action: z.string().max(100).describe("Action name (app-specific: show, complete, send, play, etc.)"),
+        parameters: z.record(z.unknown()).optional().describe("Action parameters"),
+        dryRun: dryRunParam,
+      },
+      { readOnlyHint: false, destructiveHint: false },
+      async ({ app, action, parameters: actionParams, dryRun }) => {
+        const adapter = appRegistry.getOrThrow(app);
+        policy.assertAllowed({ toolName: "app.action", bundleId: adapter.info.bundleId });
+        const { templateId, parameters } = adapter.action({ action, parameters: actionParams ?? {} });
+        return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
   );
@@ -312,7 +380,7 @@ export function createServer(deps: ServerDeps): McpServer {
       "applescript.run_template",
       "Execute a registered AppleScript template by ID (policy-gated)",
       {
-        templateId: z.string().max(200).describe("Template identifier (e.g. notes.create_note.v1)"),
+        templateId: z.string().max(200).describe("Template identifier (e.g. notes.list_notes)"),
         bundleId: z.string().max(200).describe("Target app bundle ID (e.g. com.apple.Notes)"),
         parameters: z.record(z.unknown()).optional().describe("Template parameters"),
         dryRun: dryRunParam,
@@ -320,31 +388,7 @@ export function createServer(deps: ServerDeps): McpServer {
       { readOnlyHint: false, destructiveHint: true },
       async ({ templateId, bundleId, parameters, dryRun }) => {
         policy.assertAllowed({ toolName: "applescript.run_template", bundleId });
-
-        const request: ExecutorRequest = {
-          requestId: randomUUID(),
-          bundleId,
-          mode: "template",
-          templateId,
-          parameters: parameters ?? {},
-          timeoutMs: config.defaultTimeoutMs,
-          dryRun: dryRun ?? false,
-        };
-
-        const response = await runExecutor(request, executorOptions);
-        if (!response.ok) {
-          return {
-            content: [{ type: "text", text: `Error: ${response.error.message}` }],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            { type: "text", text: `Template ${templateId} executed successfully` },
-            { type: "text", text: JSON.stringify(response.result) },
-          ],
-        };
+        return executeTemplate(templateId, bundleId, parameters ?? {}, dryRun ?? false);
       }
     )
   );
@@ -368,7 +412,6 @@ export function createServer(deps: ServerDeps): McpServer {
       async ({ script, bundleId, confirmationToken, dryRun }) => {
         policy.assertAllowed({ toolName: "applescript.run_script", bundleId });
 
-        // Require confirmation for destructive action
         const confirmResult = await confirmation.requestConfirmation(
           "applescript.run_script",
           `Execute raw AppleScript targeting ${bundleId ?? "system"}:\n${script.slice(0, 200)}${script.length > 200 ? "..." : ""}`,
@@ -418,6 +461,7 @@ export function createServer(deps: ServerDeps): McpServer {
     executorPath: config.executorPath,
     toolCount: registeredTools.size,
     enabledTools: modeManager.getEnabledTools(),
+    apps: appNames,
   });
 
   return server;

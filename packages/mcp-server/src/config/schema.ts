@@ -27,17 +27,21 @@ export const OperationModeSchema = z.enum(["readonly", "create", "full"]).defaul
 export const ModesConfigSchema = z.object({
   readonly: z.array(z.string()).default([
     "applescript.ping",
-    "applescript.list_apps",
     "applescript.get_mode",
     "applescript.set_mode",
+    "app.list_containers",
+    "app.list",
+    "app.get",
+    "app.search",
   ]),
   create: z.array(z.string()).default([
-    "notes.create_note",
-    "calendar.create_event",
-    "mail.compose_draft",
+    "app.create",
+    "app.action",
     "applescript.run_template",
   ]),
   full: z.array(z.string()).default([
+    "app.update",
+    "app.delete",
     "applescript.run_script",
   ]),
 });

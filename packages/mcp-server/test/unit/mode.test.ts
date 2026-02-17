@@ -54,20 +54,23 @@ describe("ModeManager", () => {
     assert.ok(readonlyTools.includes("applescript.ping"));
     assert.ok(readonlyTools.includes("applescript.get_mode"));
     assert.ok(readonlyTools.includes("applescript.set_mode"));
-    assert.ok(!readonlyTools.includes("notes.create_note"));
+    assert.ok(readonlyTools.includes("app.list"));
+    assert.ok(!readonlyTools.includes("app.create"));
     assert.ok(!readonlyTools.includes("applescript.run_script"));
 
     mm.setMode("create");
     const createTools = mm.getEnabledTools();
     assert.ok(createTools.includes("applescript.ping"));
-    assert.ok(createTools.includes("notes.create_note"));
-    assert.ok(createTools.includes("calendar.create_event"));
+    assert.ok(createTools.includes("app.create"));
+    assert.ok(createTools.includes("app.action"));
     assert.ok(!createTools.includes("applescript.run_script"));
 
     mm.setMode("full");
     const fullTools = mm.getEnabledTools();
     assert.ok(fullTools.includes("applescript.run_script"));
-    assert.ok(fullTools.includes("notes.create_note"));
+    assert.ok(fullTools.includes("app.create"));
+    assert.ok(fullTools.includes("app.update"));
+    assert.ok(fullTools.includes("app.delete"));
   });
 
   it("getDisabledTools is complement of enabled", () => {
@@ -91,10 +94,28 @@ describe("ModeManager.isToolAllowedInMode", () => {
     }
   });
 
-  it("notes.create_note needs create mode", () => {
-    assert.equal(mm.isToolAllowedInMode("notes.create_note", "readonly"), false);
-    assert.equal(mm.isToolAllowedInMode("notes.create_note", "create"), true);
-    assert.equal(mm.isToolAllowedInMode("notes.create_note", "full"), true);
+  it("notes.create_note needs create mode (custom config)", () => {
+    const customMap = buildToolModeMap({
+      readonly: ["applescript.ping"],
+      create: ["notes.create_note"],
+      full: ["applescript.run_script"],
+    });
+    const customMm = new ModeManager("readonly", customMap);
+    assert.equal(customMm.isToolAllowedInMode("notes.create_note", "readonly"), false);
+    assert.equal(customMm.isToolAllowedInMode("notes.create_note", "create"), true);
+    assert.equal(customMm.isToolAllowedInMode("notes.create_note", "full"), true);
+  });
+
+  it("app.create needs create mode", () => {
+    assert.equal(mm.isToolAllowedInMode("app.create", "readonly"), false);
+    assert.equal(mm.isToolAllowedInMode("app.create", "create"), true);
+    assert.equal(mm.isToolAllowedInMode("app.create", "full"), true);
+  });
+
+  it("app.delete needs full mode", () => {
+    assert.equal(mm.isToolAllowedInMode("app.delete", "readonly"), false);
+    assert.equal(mm.isToolAllowedInMode("app.delete", "create"), false);
+    assert.equal(mm.isToolAllowedInMode("app.delete", "full"), true);
   });
 
   it("run_script needs full mode", () => {
@@ -119,8 +140,16 @@ describe("ModeManager.isDestructiveTool", () => {
     assert.equal(mm.isDestructiveTool("applescript.run_template"), true);
   });
 
-  it("marks notes.create_note as non-destructive", () => {
-    assert.equal(mm.isDestructiveTool("notes.create_note"), false);
+  it("marks app.create as non-destructive", () => {
+    assert.equal(mm.isDestructiveTool("app.create"), false);
+  });
+
+  it("marks app.delete as destructive", () => {
+    assert.equal(mm.isDestructiveTool("app.delete"), true);
+  });
+
+  it("marks app.update as destructive", () => {
+    assert.equal(mm.isDestructiveTool("app.update"), true);
   });
 
   it("marks ping as non-destructive", () => {

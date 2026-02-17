@@ -32,6 +32,8 @@ export interface ToolModeInfo {
 const DESTRUCTIVE_TOOLS = new Set([
   "applescript.run_template",
   "applescript.run_script",
+  "app.update",
+  "app.delete",
 ]);
 
 /**
@@ -55,17 +57,21 @@ export function buildToolModeMap(modes: ModesConfig): Record<string, ToolModeInf
 export const DEFAULT_TOOL_MODE_MAP: Record<string, ToolModeInfo> = buildToolModeMap({
   readonly: [
     "applescript.ping",
-    "applescript.list_apps",
     "applescript.get_mode",
     "applescript.set_mode",
+    "app.list_containers",
+    "app.list",
+    "app.get",
+    "app.search",
   ],
   create: [
-    "notes.create_note",
-    "calendar.create_event",
-    "mail.compose_draft",
+    "app.create",
+    "app.action",
     "applescript.run_template",
   ],
   full: [
+    "app.update",
+    "app.delete",
     "applescript.run_script",
   ],
 });

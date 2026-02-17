@@ -57,7 +57,7 @@ describe("ConfigSchema", () => {
     assert.equal(DEFAULT_CONFIG.runScript.enabled, false);
     assert.equal(DEFAULT_CONFIG.logging.level, "info");
     assert.ok(DEFAULT_CONFIG.modes.readonly.includes("applescript.ping"));
-    assert.ok(DEFAULT_CONFIG.modes.create.includes("notes.create_note"));
+    assert.ok(DEFAULT_CONFIG.modes.create.includes("app.create"));
     assert.ok(DEFAULT_CONFIG.modes.full.includes("applescript.run_script"));
   });
 
