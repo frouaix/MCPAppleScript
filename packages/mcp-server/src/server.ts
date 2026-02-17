@@ -10,7 +10,7 @@ import {
   ModeManager,
   OperationMode,
   ALL_MODES,
-  isToolAllowedInMode,
+  buildToolModeMap,
 } from "./mode/mode.js";
 import { ConfirmationManager } from "./mode/confirmation.js";
 
@@ -25,7 +25,7 @@ export interface ServerDeps {
 export function createServer(deps: ServerDeps): McpServer {
   const { config, policy, logger } = deps;
 
-  const modeManager = new ModeManager(config.defaultMode);
+  const modeManager = new ModeManager(config.defaultMode, buildToolModeMap(config.modes));
   const confirmation = new ConfirmationManager();
 
   const server = new McpServer(
@@ -44,14 +44,14 @@ export function createServer(deps: ServerDeps): McpServer {
   function registerTool(name: string, tool: RegisteredTool): void {
     registeredTools.set(name, tool);
     // Disable tools not allowed in current mode at registration time
-    if (!isToolAllowedInMode(name, modeManager.getMode())) {
+    if (!modeManager.isToolAllowedInMode(name, modeManager.getMode())) {
       tool.disable();
     }
   }
 
   function applyMode(): void {
     for (const [name, tool] of registeredTools) {
-      if (isToolAllowedInMode(name, modeManager.getMode())) {
+      if (modeManager.isToolAllowedInMode(name, modeManager.getMode())) {
         tool.enable();
       } else {
         tool.disable();

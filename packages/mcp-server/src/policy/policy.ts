@@ -1,7 +1,7 @@
 import { Config, AppConfig } from "../config/schema.js";
 import { PolicyDeniedError } from "../util/errors.js";
 import { Logger } from "../util/logging.js";
-import { ModeManager, isToolAllowedInMode } from "../mode/mode.js";
+import { ModeManager } from "../mode/mode.js";
 
 export interface PolicyContext {
   toolName: string;
@@ -30,7 +30,7 @@ export class PolicyEngine {
     // Mode check: reject tools not allowed in current mode
     if (this.modeManager) {
       const mode = this.modeManager.getMode();
-      if (!isToolAllowedInMode(toolName, mode)) {
+      if (!this.modeManager.isToolAllowedInMode(toolName, mode)) {
         this.logger.warn("Policy denied: tool not allowed in current mode", {
           toolName,
           mode,

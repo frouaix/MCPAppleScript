@@ -56,5 +56,29 @@ describe("ConfigSchema", () => {
     assert.equal(DEFAULT_CONFIG.defaultTimeoutMs, 12000);
     assert.equal(DEFAULT_CONFIG.runScript.enabled, false);
     assert.equal(DEFAULT_CONFIG.logging.level, "info");
+    assert.ok(DEFAULT_CONFIG.modes.readonly.includes("applescript.ping"));
+    assert.ok(DEFAULT_CONFIG.modes.create.includes("notes.create_note"));
+    assert.ok(DEFAULT_CONFIG.modes.full.includes("applescript.run_script"));
+  });
+
+  it("should accept custom modes config", () => {
+    const result = ConfigSchema.safeParse({
+      modes: {
+        readonly: ["applescript.ping", "notes.create_note"],
+        create: [],
+        full: ["applescript.run_script"],
+      },
+    });
+    assert.ok(result.success, "Should parse custom modes");
+    assert.deepStrictEqual(result.data.modes.readonly, ["applescript.ping", "notes.create_note"]);
+    assert.deepStrictEqual(result.data.modes.create, []);
+  });
+
+  it("should apply mode defaults when modes is empty object", () => {
+    const result = ConfigSchema.safeParse({ modes: {} });
+    assert.ok(result.success);
+    assert.ok(result.data.modes.readonly.length > 0);
+    assert.ok(result.data.modes.create.length > 0);
+    assert.ok(result.data.modes.full.length > 0);
   });
 });

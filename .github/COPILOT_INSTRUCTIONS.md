@@ -20,6 +20,8 @@ The server has three operation modes, defaulting to **readonly**:
 
 Mode is changed via `applescript.set_mode` tool. Tools are dynamically enabled/disabled using `RegisteredTool.enable()/disable()` and `sendToolListChanged()`.
 
+The tool-to-mode mapping is **configurable** in `config.modes`. Each mode lists the tools introduced at that level; modes are cumulative. The hardcoded defaults can be overridden to promote or restrict tools.
+
 Destructive actions in full mode use MCP elicitation for user confirmation, with a confirmation-token fallback for clients that don't support elicitation.
 
 ## Key Design Principles
@@ -35,7 +37,7 @@ Destructive actions in full mode use MCP elicitation for user confirmation, with
 
 - **Package Manager**: pnpm with workspaces
 - **TypeScript**: Strict mode with comprehensive type checking
-- **Testing**: node:test for TypeScript (73 unit + 4 integration tests)
+- **Testing**: node:test for TypeScript (79 unit + 4 integration tests)
 - **MCP SDK**: @modelcontextprotocol/sdk v1.26 (elicitation, tool annotations, dynamic tool list)
 - **Validation**: Zod schemas
 - **Swift**: NSAppleScript for AppleScript execution
@@ -59,7 +61,9 @@ Destructive actions in full mode use MCP elicitation for user confirmation, with
 
 ## Registered Tools (9 total)
 
-| Tool | Mode | Annotations |
+Tool-to-mode mapping is configurable via `config.modes`. Default classification:
+
+| Tool | Default Mode | Annotations |
 |------|------|-------------|
 | `applescript.ping` | readonly | readOnlyHint: true |
 | `applescript.list_apps` | readonly | readOnlyHint: true |
@@ -107,7 +111,7 @@ Destructive actions in full mode use MCP elicitation for user confirmation, with
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages
-pnpm test:unit        # Unit tests (73 tests)
+pnpm test:unit        # Unit tests (79 tests)
 pnpm test:integration # Integration tests (4 tests, macOS only)
 pnpm lint             # Lint
 pnpm format           # Format

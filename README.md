@@ -125,6 +125,11 @@ Configuration lives at `~/.config/applescript-mcp/config.json` (override via `AP
   "executorPath": "/usr/local/bin/applescript-executor",
   "defaultTimeoutMs": 12000,
   "defaultMode": "readonly",
+  "modes": {
+    "readonly": ["applescript.ping", "applescript.list_apps", "applescript.get_mode", "applescript.set_mode"],
+    "create": ["notes.create_note", "calendar.create_event", "mail.compose_draft", "applescript.run_template"],
+    "full": ["applescript.run_script"]
+  },
   "apps": {
     "com.apple.Notes": {
       "enabled": true,
@@ -150,10 +155,15 @@ Configuration lives at `~/.config/applescript-mcp/config.json` (override via `AP
 }
 ```
 
+### Modes
+
+The `modes` section controls which tools are available at each operation mode level. Modes are cumulative — `create` includes all `readonly` tools, `full` includes all `create` tools. You can customize this to promote tools to a lower mode or restrict them to a higher one.
+
 ### Policy Model
 
 - **Per-app allowlists**: Each app must be explicitly configured and enabled
 - **Per-tool permissions**: Control which tools can target which apps
+- **Per-mode tool gating**: Each tool requires a minimum mode level (configurable via `modes`)
 - **`run_script` disabled by default**: Raw AppleScript execution requires explicit opt-in
 - **Timeouts enforced**: All operations are time-bounded
 

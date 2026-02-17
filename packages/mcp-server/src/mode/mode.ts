@@ -5,7 +5,12 @@
  * - readonly: only read/query tools (ping, list_apps, get_mode, set_mode)
  * - create:   readonly + creation tools (notes, calendar, mail, run_template)
  * - full:     all tools including destructive ones (run_script)
+ *
+ * The tool-to-mode mapping is configurable via config.modes. Each mode lists
+ * the tools introduced at that level; modes are cumulative.
  */
+
+import { ModesConfig } from "../config/schema.js";
 
 export type OperationMode = "readonly" | "create" | "full";
 
@@ -23,37 +28,61 @@ export interface ToolModeInfo {
   destructive: boolean;
 }
 
-/** Classification of every registered tool. */
-export const TOOL_MODE_MAP: Record<string, ToolModeInfo> = {
-  "applescript.ping": { minMode: "readonly", destructive: false },
-  "applescript.list_apps": { minMode: "readonly", destructive: false },
-  "applescript.get_mode": { minMode: "readonly", destructive: false },
-  "applescript.set_mode": { minMode: "readonly", destructive: false },
-  "notes.create_note": { minMode: "create", destructive: false },
-  "calendar.create_event": { minMode: "create", destructive: false },
-  "mail.compose_draft": { minMode: "create", destructive: false },
-  "applescript.run_template": { minMode: "create", destructive: true },
-  "applescript.run_script": { minMode: "full", destructive: true },
-};
+/** Hardcoded destructive flags — inherent to the tool's nature. */
+const DESTRUCTIVE_TOOLS = new Set([
+  "applescript.run_template",
+  "applescript.run_script",
+]);
 
-export function isToolAllowedInMode(toolName: string, mode: OperationMode): boolean {
-  const info = TOOL_MODE_MAP[toolName];
-  if (!info) return false;
-  return MODE_LEVELS[mode] >= MODE_LEVELS[info.minMode];
+/**
+ * Build a ToolModeMap from the config `modes` section.
+ * Each mode lists the tools introduced at that level.
+ */
+export function buildToolModeMap(modes: ModesConfig): Record<string, ToolModeInfo> {
+  const map: Record<string, ToolModeInfo> = {};
+  for (const mode of ALL_MODES) {
+    for (const tool of modes[mode]) {
+      map[tool] = {
+        minMode: mode,
+        destructive: DESTRUCTIVE_TOOLS.has(tool),
+      };
+    }
+  }
+  return map;
 }
 
-export function isDestructiveTool(toolName: string): boolean {
-  return TOOL_MODE_MAP[toolName]?.destructive === true;
-}
+/** Default tool-to-mode mapping (matches ModesConfigSchema defaults). */
+export const DEFAULT_TOOL_MODE_MAP: Record<string, ToolModeInfo> = buildToolModeMap({
+  readonly: [
+    "applescript.ping",
+    "applescript.list_apps",
+    "applescript.get_mode",
+    "applescript.set_mode",
+  ],
+  create: [
+    "notes.create_note",
+    "calendar.create_event",
+    "mail.compose_draft",
+    "applescript.run_template",
+  ],
+  full: [
+    "applescript.run_script",
+  ],
+});
 
 export type ModeChangeListener = (oldMode: OperationMode, newMode: OperationMode) => void;
 
 export class ModeManager {
   private mode: OperationMode;
+  private readonly toolModeMap: Record<string, ToolModeInfo>;
   private listeners: ModeChangeListener[] = [];
 
-  constructor(defaultMode: OperationMode = "readonly") {
+  constructor(
+    defaultMode: OperationMode = "readonly",
+    toolModeMap: Record<string, ToolModeInfo> = DEFAULT_TOOL_MODE_MAP,
+  ) {
     this.mode = defaultMode;
+    this.toolModeMap = toolModeMap;
   }
 
   getMode(): OperationMode {
@@ -75,13 +104,25 @@ export class ModeManager {
     this.listeners.push(listener);
   }
 
+  /** Check if a tool is allowed in the given mode. */
+  isToolAllowedInMode(toolName: string, mode: OperationMode): boolean {
+    const info = this.toolModeMap[toolName];
+    if (!info) return false;
+    return MODE_LEVELS[mode] >= MODE_LEVELS[info.minMode];
+  }
+
+  /** Check if a tool is classified as destructive. */
+  isDestructiveTool(toolName: string): boolean {
+    return this.toolModeMap[toolName]?.destructive === true;
+  }
+
   /** Returns tool names that should be enabled for the current mode. */
   getEnabledTools(): string[] {
-    return Object.keys(TOOL_MODE_MAP).filter((name) => isToolAllowedInMode(name, this.mode));
+    return Object.keys(this.toolModeMap).filter((name) => this.isToolAllowedInMode(name, this.mode));
   }
 
   /** Returns tool names that should be disabled for the current mode. */
   getDisabledTools(): string[] {
-    return Object.keys(TOOL_MODE_MAP).filter((name) => !isToolAllowedInMode(name, this.mode));
+    return Object.keys(this.toolModeMap).filter((name) => !this.isToolAllowedInMode(name, this.mode));
   }
 }
