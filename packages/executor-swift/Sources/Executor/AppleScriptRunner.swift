@@ -64,6 +64,11 @@ enum AppleScriptRunner {
         return result
     }
 
+    /// Builds an AppleScript string from a template identifier and parameters (public for dryRun).
+    static func buildScript(templateId: String, bundleId: String, parameters: [String: Any]) throws -> String {
+        return try buildTemplateScript(templateId: templateId, bundleId: bundleId, parameters: parameters)
+    }
+
     /// Builds an AppleScript string from a template identifier and parameters.
     private static func buildTemplateScript(templateId: String, bundleId: String, parameters: [String: Any]) throws -> String {
         switch templateId {

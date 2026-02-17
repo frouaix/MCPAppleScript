@@ -6,6 +6,7 @@ export interface ExecutorRequest {
   script?: string;
   parameters: Record<string, unknown>;
   timeoutMs: number;
+  dryRun?: boolean;
 }
 
 export interface ExecutorSuccessResponse {

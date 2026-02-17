@@ -152,15 +152,24 @@ export function createServer(deps: ServerDeps): McpServer {
     )
   );
 
+  // Shared schema fragments
+  const dryRunParam = z.boolean().optional().describe("If true, return the generated script without executing it");
+  const MAX_TEXT = 10000;
+  const MAX_TITLE = 500;
+
   // --- notes.create_note ---
   registerTool(
     "notes.create_note",
     server.tool(
       "notes.create_note",
       "Create a new note in Apple Notes",
-      { title: z.string().describe("Title of the note"), body: z.string().describe("Body content") },
+      {
+        title: z.string().max(MAX_TITLE).describe("Title of the note"),
+        body: z.string().max(MAX_TEXT).describe("Body content"),
+        dryRun: dryRunParam,
+      },
       { readOnlyHint: false, destructiveHint: false },
-      async ({ title, body }) => {
+      async ({ title, body, dryRun }) => {
         const bundleId = "com.apple.Notes";
         policy.assertAllowed({ toolName: "notes.create_note", bundleId });
 
@@ -171,6 +180,7 @@ export function createServer(deps: ServerDeps): McpServer {
           templateId: "notes.create_note.v1",
           parameters: { title, body },
           timeoutMs: config.defaultTimeoutMs,
+          dryRun: dryRun ?? false,
         };
 
         const response = await runExecutor(request, executorOptions);
@@ -198,15 +208,16 @@ export function createServer(deps: ServerDeps): McpServer {
       "calendar.create_event",
       "Create a new event in Apple Calendar",
       {
-        title: z.string().describe("Event title"),
-        start: z.string().describe("Start date/time (ISO 8601 or natural language)"),
-        end: z.string().describe("End date/time (ISO 8601 or natural language)"),
-        calendarName: z.string().optional().describe("Calendar name (default: Calendar)"),
-        location: z.string().optional().describe("Event location"),
-        notes: z.string().optional().describe("Event notes"),
+        title: z.string().max(MAX_TITLE).describe("Event title"),
+        start: z.string().max(100).describe("Start date/time (ISO 8601 or natural language)"),
+        end: z.string().max(100).describe("End date/time (ISO 8601 or natural language)"),
+        calendarName: z.string().max(200).optional().describe("Calendar name (default: Calendar)"),
+        location: z.string().max(500).optional().describe("Event location"),
+        notes: z.string().max(MAX_TEXT).optional().describe("Event notes"),
+        dryRun: dryRunParam,
       },
       { readOnlyHint: false, destructiveHint: false },
-      async ({ title, start, end, calendarName, location, notes }) => {
+      async ({ title, start, end, calendarName, location, notes, dryRun }) => {
         const bundleId = "com.apple.iCal";
         policy.assertAllowed({ toolName: "calendar.create_event", bundleId });
 
@@ -224,6 +235,7 @@ export function createServer(deps: ServerDeps): McpServer {
             notes: notes ?? "",
           },
           timeoutMs: config.defaultTimeoutMs,
+          dryRun: dryRun ?? false,
         };
 
         const response = await runExecutor(request, executorOptions);
@@ -251,12 +263,13 @@ export function createServer(deps: ServerDeps): McpServer {
       "mail.compose_draft",
       "Compose a new email draft in Apple Mail",
       {
-        to: z.string().describe("Recipient email address"),
-        subject: z.string().optional().describe("Email subject"),
-        body: z.string().optional().describe("Email body"),
+        to: z.string().max(500).describe("Recipient email address"),
+        subject: z.string().max(MAX_TITLE).optional().describe("Email subject"),
+        body: z.string().max(MAX_TEXT).optional().describe("Email body"),
+        dryRun: dryRunParam,
       },
       { readOnlyHint: false, destructiveHint: false },
-      async ({ to, subject, body }) => {
+      async ({ to, subject, body, dryRun }) => {
         const bundleId = "com.apple.mail";
         policy.assertAllowed({ toolName: "mail.compose_draft", bundleId });
 
@@ -271,6 +284,7 @@ export function createServer(deps: ServerDeps): McpServer {
             body: body ?? "",
           },
           timeoutMs: config.defaultTimeoutMs,
+          dryRun: dryRun ?? false,
         };
 
         const response = await runExecutor(request, executorOptions);
@@ -298,12 +312,13 @@ export function createServer(deps: ServerDeps): McpServer {
       "applescript.run_template",
       "Execute a registered AppleScript template by ID (policy-gated)",
       {
-        templateId: z.string().describe("Template identifier (e.g. notes.create_note.v1)"),
-        bundleId: z.string().describe("Target app bundle ID (e.g. com.apple.Notes)"),
+        templateId: z.string().max(200).describe("Template identifier (e.g. notes.create_note.v1)"),
+        bundleId: z.string().max(200).describe("Target app bundle ID (e.g. com.apple.Notes)"),
         parameters: z.record(z.unknown()).optional().describe("Template parameters"),
+        dryRun: dryRunParam,
       },
       { readOnlyHint: false, destructiveHint: true },
-      async ({ templateId, bundleId, parameters }) => {
+      async ({ templateId, bundleId, parameters, dryRun }) => {
         policy.assertAllowed({ toolName: "applescript.run_template", bundleId });
 
         const request: ExecutorRequest = {
@@ -313,6 +328,7 @@ export function createServer(deps: ServerDeps): McpServer {
           templateId,
           parameters: parameters ?? {},
           timeoutMs: config.defaultTimeoutMs,
+          dryRun: dryRun ?? false,
         };
 
         const response = await runExecutor(request, executorOptions);
@@ -340,15 +356,16 @@ export function createServer(deps: ServerDeps): McpServer {
       "applescript.run_script",
       "Execute raw AppleScript (requires full mode + explicit config). May cause data loss — confirmation required.",
       {
-        script: z.string().describe("AppleScript source code to execute"),
-        bundleId: z.string().optional().describe("Target app bundle ID for policy check"),
+        script: z.string().max(50000).describe("AppleScript source code to execute"),
+        bundleId: z.string().max(200).optional().describe("Target app bundle ID for policy check"),
         confirmationToken: z
           .string()
           .optional()
           .describe("Confirmation token from a previous call (required if elicitation unavailable)"),
+        dryRun: dryRunParam,
       },
       { readOnlyHint: false, destructiveHint: true },
-      async ({ script, bundleId, confirmationToken }) => {
+      async ({ script, bundleId, confirmationToken, dryRun }) => {
         policy.assertAllowed({ toolName: "applescript.run_script", bundleId });
 
         // Require confirmation for destructive action
@@ -371,6 +388,7 @@ export function createServer(deps: ServerDeps): McpServer {
           script,
           parameters: {},
           timeoutMs: config.defaultTimeoutMs,
+          dryRun: dryRun ?? false,
         };
 
         const response = await runExecutor(request, executorOptions);

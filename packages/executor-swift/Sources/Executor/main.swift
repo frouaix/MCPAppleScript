@@ -10,6 +10,7 @@ struct ExecutorRequest: Codable {
     let script: String?
     let parameters: [String: AnyCodable]
     let timeoutMs: Int
+    let dryRun: Bool?
 }
 
 struct ExecutorSuccessResponse: Codable {
@@ -123,6 +124,7 @@ struct Executor {
             }
 
             let result: [String: Any]
+            let isDryRun = request.dryRun ?? false
 
             switch request.mode {
             case "template":
@@ -130,17 +132,30 @@ struct Executor {
                     throw ExecutorError.invalidRequest("Template mode requires 'templateId'")
                 }
                 let params = request.parameters.mapValues { $0.value }
-                result = try AppleScriptRunner.executeTemplate(
-                    templateId: templateId,
-                    bundleId: request.bundleId,
-                    parameters: params
-                )
+                if isDryRun {
+                    let script = try AppleScriptRunner.buildScript(
+                        templateId: templateId,
+                        bundleId: request.bundleId,
+                        parameters: params
+                    )
+                    result = ["dryRun": true, "script": script]
+                } else {
+                    result = try AppleScriptRunner.executeTemplate(
+                        templateId: templateId,
+                        bundleId: request.bundleId,
+                        parameters: params
+                    )
+                }
 
             case "raw":
                 guard let script = request.script else {
                     throw ExecutorError.invalidRequest("Raw mode requires 'script'")
                 }
-                result = try AppleScriptRunner.execute(script: script)
+                if isDryRun {
+                    result = ["dryRun": true, "script": script]
+                } else {
+                    result = try AppleScriptRunner.execute(script: script)
+                }
 
             default:
                 throw ExecutorError.invalidRequest("Unknown mode: \(request.mode)")
