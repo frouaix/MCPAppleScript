@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.js
+*.js.map
+*.d.ts
+!*.config.js
+
+# Swift build
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+
+# Executables
+packages/executor-swift/.build/
+applescript-executor
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment & Config
+.env
+.env.local
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Session state
+.copilot/

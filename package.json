@@ -1,0 +1,33 @@
+{
+  "name": "mcp-applescript",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for controlled AppleScript automation on macOS",
+  "author": "François Rouaix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frouaix/MCPAppleScript.git"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "applescript",
+    "automation",
+    "macos",
+    "apple-events"
+  ]
+}
