@@ -174,10 +174,85 @@ export function createServer(deps: ServerDeps): McpServer {
     }
   );
 
+  // --- applescript.run_template ---
+  server.tool(
+    "applescript.run_template",
+    "Execute a registered AppleScript template by ID (policy-gated)",
+    {
+      templateId: z.string().describe("Template identifier (e.g. notes.create_note.v1)"),
+      bundleId: z.string().describe("Target app bundle ID (e.g. com.apple.Notes)"),
+      parameters: z.record(z.unknown()).optional().describe("Template parameters"),
+    },
+    async ({ templateId, bundleId, parameters }) => {
+      policy.assertAllowed({ toolName: "applescript.run_template", bundleId });
+
+      const request: ExecutorRequest = {
+        requestId: randomUUID(),
+        bundleId,
+        mode: "template",
+        templateId,
+        parameters: parameters ?? {},
+        timeoutMs: config.defaultTimeoutMs,
+      };
+
+      const response = await runExecutor(request, executorOptions);
+      if (!response.ok) {
+        return {
+          content: [{ type: "text", text: `Error: ${response.error.message}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          { type: "text", text: `Template ${templateId} executed successfully` },
+          { type: "text", text: JSON.stringify(response.result) },
+        ],
+      };
+    }
+  );
+
+  // --- applescript.run_script ---
+  server.tool(
+    "applescript.run_script",
+    "Execute raw AppleScript (disabled by default, requires explicit config)",
+    {
+      script: z.string().describe("AppleScript source code to execute"),
+      bundleId: z.string().optional().describe("Target app bundle ID for policy check"),
+    },
+    async ({ script, bundleId }) => {
+      policy.assertAllowed({ toolName: "applescript.run_script", bundleId });
+
+      const request: ExecutorRequest = {
+        requestId: randomUUID(),
+        bundleId: bundleId ?? "com.apple.systemevents",
+        mode: "raw",
+        script,
+        parameters: {},
+        timeoutMs: config.defaultTimeoutMs,
+      };
+
+      const response = await runExecutor(request, executorOptions);
+      if (!response.ok) {
+        return {
+          content: [{ type: "text", text: `Error: ${response.error.message}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          { type: "text", text: "Script executed successfully" },
+          { type: "text", text: JSON.stringify(response.result) },
+        ],
+      };
+    }
+  );
+
   logger.info("MCP server created", {
     version: VERSION,
     executorPath: config.executorPath,
-    toolCount: 5,
+    toolCount: 7,
   });
 
   return server;

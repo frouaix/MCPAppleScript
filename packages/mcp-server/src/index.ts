@@ -15,6 +15,11 @@ async function main() {
 
   const server = createServer({ config, policy, logger });
   const transport = new StdioServerTransport();
+
+  server.server.onerror = (err) => {
+    logger.error("MCP server error", { error: String(err) });
+  };
+
   await server.connect(transport);
 
   logger.info("MCP-AppleScript server running on stdio");

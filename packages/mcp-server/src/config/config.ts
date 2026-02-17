@@ -9,7 +9,7 @@ const CONFIG_ENV_VAR = "APPLESCRIPT_MCP_CONFIG";
 
 export function resolveConfigPath(): string | undefined {
   const envPath = process.env[CONFIG_ENV_VAR];
-  if (envPath) {
+  if (envPath && envPath.length > 0) {
     const resolved = resolve(envPath);
     if (existsSync(resolved)) return resolved;
     throw new Error(`Config file not found at APPLESCRIPT_MCP_CONFIG path: ${envPath}`);

@@ -11,9 +11,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "test": "node --test --experimental-test-coverage",
-    "test:unit": "node --test test/unit/**/*.test.ts",
-    "test:integration": "node --test test/integration/**/*.test.ts",
+    "test": "npx tsx --test test/unit/*.test.ts",
+    "test:unit": "npx tsx --test test/unit/*.test.ts",
+    "test:integration": "npx tsx --test test/integration/*.test.ts",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",

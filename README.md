@@ -4,26 +4,22 @@ A local MCP server that exposes controlled AppleScript automation tools to MCP c
 
 ## Overview
 
-MCP-AppleScript provides a secure bridge between the Model Context Protocol and macOS automation via AppleScript. It consists of two components:
+MCP-AppleScript provides a secure bridge between the [Model Context Protocol](https://modelcontextprotocol.io/) and macOS automation via AppleScript. It consists of two components:
 
 - **MCP Server (TypeScript/Node.js)**: Handles the MCP protocol, tool schemas, configuration, validation, logging, and policy enforcement
-- **Swift Executor**: Executes AppleScript commands and returns structured JSON results
+- **Swift Executor**: Executes AppleScript commands via `NSAppleScript` and returns structured JSON results
 
-## Features
+## Tools
 
-- 🔒 **Secure by default**: Policy-based allowlists for apps and tools
-- 📝 **Template-based**: Pre-defined, parameterized scripts for safety
-- 🛠️ **Multiple tools**: Notes, Calendar, Mail automation and more
-- ⚙️ **Configurable**: Fine-grained control over permissions and behavior
-- 📊 **Structured outputs**: All tools return JSON data + human-readable summaries
-- 🧪 **Well-tested**: Comprehensive unit and integration tests
-
-## Supported Apps (Planned)
-
-- **Notes**: Create notes
-- **Calendar**: Create events
-- **Mail**: Compose drafts
-- More coming soon...
+| Tool | Description |
+|------|-------------|
+| `applescript.ping` | Health check — returns server version |
+| `applescript.list_apps` | List configured apps and their policy status |
+| `notes.create_note` | Create a new note in Apple Notes |
+| `calendar.create_event` | Create an event in Apple Calendar |
+| `mail.compose_draft` | Compose an email draft in Apple Mail |
+| `applescript.run_template` | Execute a registered template by ID (policy-gated) |
+| `applescript.run_script` | Execute raw AppleScript (disabled by default) |
 
 ## Requirements
 
@@ -32,28 +28,39 @@ MCP-AppleScript provides a secure bridge between the Model Context Protocol and 
 - Swift 5.9+ (for building the executor)
 - pnpm 8+
 
-## Installation
-
-> ⚠️ **Status**: This project is currently under development.
+## Quick Start
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/frouaix/MCPAppleScript.git
 cd MCPAppleScript
+./install.sh
+```
 
-# Install dependencies
-pnpm install
+The install script will:
+1. Install Node.js dependencies
+2. Build the TypeScript MCP server
+3. Build and install the Swift executor to `/usr/local/bin/`
+4. Create a default config at `~/.config/applescript-mcp/config.json`
 
-# Build the project
-pnpm build
+### Claude Desktop Integration
 
-# Run tests
-pnpm test
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "applescript": {
+      "command": "node",
+      "args": ["/path/to/MCPAppleScript/packages/mcp-server/dist/index.js"]
+    }
+  }
+}
 ```
 
 ## Configuration
 
-Create a configuration file at `~/.config/applescript-mcp/config.json`:
+Configuration lives at `~/.config/applescript-mcp/config.json` (override via `APPLESCRIPT_MCP_CONFIG` env var):
 
 ```json
 {
@@ -62,58 +69,118 @@ Create a configuration file at `~/.config/applescript-mcp/config.json`:
   "apps": {
     "com.apple.Notes": {
       "enabled": true,
-      "allowedTools": ["notes.create_note"]
+      "allowedTools": ["notes.create_note", "applescript.run_template"]
+    },
+    "com.apple.iCal": {
+      "enabled": true,
+      "allowedTools": ["calendar.create_event"]
+    },
+    "com.apple.mail": {
+      "enabled": true,
+      "allowedTools": ["mail.compose_draft"]
     }
+  },
+  "runScript": {
+    "enabled": false,
+    "allowedBundleIds": []
   },
   "logging": {
     "level": "info",
-    "redact": ["email", "content"]
+    "redact": ["email", "content", "body"]
   }
 }
 ```
 
-## Automation Permissions
+### Policy Model
 
-On first use, macOS will prompt for automation permissions. You need to:
+- **Per-app allowlists**: Each app must be explicitly configured and enabled
+- **Per-tool permissions**: Control which tools can target which apps
+- **`run_script` disabled by default**: Raw AppleScript execution requires explicit opt-in
+- **Timeouts enforced**: All operations are time-bounded
+
+## Automation Permissions (TCC)
+
+On first use, macOS will prompt for automation permissions:
 
 1. Open **System Settings** → **Privacy & Security** → **Automation**
 2. Find your terminal or the executor binary
-3. Enable permissions for the apps you want to automate (Notes, Calendar, etc.)
+3. Enable permissions for the apps you want to automate (Notes, Calendar, Mail)
+
+If you see `AUTOMATION_DENIED` errors, check these permissions.
 
 ## Architecture
 
-The system uses a two-process architecture:
-
 ```
-MCP Client
-    ↓ (stdio)
+MCP Client (Claude, etc.)
+    ↕ stdio (JSON-RPC)
 TypeScript MCP Server
-    ↓ (JSON over stdin/stdout)
-Swift Executor
-    ↓ (Apple Events)
-macOS Apps (Notes, Calendar, etc.)
+    ↕ JSON over stdin/stdout
+Swift Executor (applescript-executor)
+    ↕ Apple Events
+macOS Apps (Notes, Calendar, Mail)
+```
+
+The Node process is the only MCP-facing component. Swift is a helper invoked locally for each tool call. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build everything
+pnpm build
+
+# Run unit tests (53 tests)
+pnpm test:unit
+
+# Run integration tests (requires macOS)
+pnpm test:integration
+
+# Build Swift executor
+cd packages/executor-swift && swift build
+
+# Run the server in development mode
+cd packages/mcp-server && pnpm dev
 ```
 
 ## Security
 
-- Template-based execution prevents arbitrary script injection
-- Per-app, per-tool permission model
-- Input validation with Zod schemas
-- Sensitive data redaction in logs
-- Timeout enforcement on all operations
+- **Template-based execution** prevents arbitrary script injection
+- **Per-app, per-tool permission model** with explicit allowlists
+- **Input validation** with Zod schemas on all tool parameters
+- **Sensitive data redaction** in logs (configurable)
+- **Timeout enforcement** on all executor operations
+- **Stable error codes** for all failure modes
 
-## Development
+## Project Structure
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+```
+MCPAppleScript/
+  packages/
+    mcp-server/          # TypeScript MCP server
+      src/
+        index.ts         # Stdio entrypoint
+        server.ts        # MCP server + tool registration
+        config/          # Configuration loading + Zod schemas
+        policy/          # Allowlist/denylist enforcement
+        exec/            # Executor spawning + IPC
+        util/            # Errors, logging, JSON utils
+    executor-swift/      # Swift executor CLI
+      Sources/Executor/
+        main.swift       # JSON dispatcher
+        AppleScriptRunner.swift  # NSAppleScript execution
+        AppTargeting.swift       # Bundle ID handling
+        Errors.swift     # Error code mapping
+        JsonIO.swift     # Stdin/stdout JSON I/O
+  docs/                  # Architecture documentation
+  install.sh             # One-step installer
+```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE)
 
 ## Author
 
 François Rouaix
-
-## Status
-
-🚧 **Under Development** - Not yet ready for production use.
