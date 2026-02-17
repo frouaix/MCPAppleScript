@@ -92,6 +92,8 @@ enum AppleScriptRunner {
             return try MusicTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         case "finder":
             return try FinderTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "safari":
+            return try SafariTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         default:
             throw ExecutorError.invalidRequest("Unknown template prefix: \(prefix) (template: \(templateId))")
         }

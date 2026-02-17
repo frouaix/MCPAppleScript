@@ -9,6 +9,7 @@ import { MessagesAdapter } from "../../src/adapters/messages.js";
 import { PhotosAdapter } from "../../src/adapters/photos.js";
 import { MusicAdapter } from "../../src/adapters/music.js";
 import { FinderAdapter } from "../../src/adapters/finder.js";
+import { SafariAdapter } from "../../src/adapters/safari.js";
 import { AppRegistry, UnsupportedOperationError } from "../../src/adapters/index.js";
 
 describe("NotesAdapter", () => {
@@ -362,6 +363,70 @@ describe("FinderAdapter", () => {
   it("action reveal works", () => {
     const result = adapter.action({ action: "reveal", parameters: { path: "/tmp/x" } });
     assert.equal(result.templateId, "finder.reveal");
+  });
+
+  it("action throws for unsupported", () => {
+    assert.throws(
+      () => adapter.action({ action: "play", parameters: {} }),
+      UnsupportedOperationError
+    );
+  });
+});
+
+describe("SafariAdapter", () => {
+  const adapter = new SafariAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "safari");
+    assert.equal(adapter.info.bundleId, "com.apple.Safari");
+    assert.equal(adapter.info.itemType, "tab");
+    assert.equal(adapter.info.containerType, "window");
+    assert.equal(adapter.info.capabilities.update, false);
+  });
+
+  it("listContainers returns windows template", () => {
+    assert.equal(adapter.listContainers().templateId, "safari.list_windows");
+  });
+
+  it("list returns tabs template", () => {
+    const result = adapter.list({});
+    assert.equal(result.templateId, "safari.list_tabs");
+  });
+
+  it("get parses tabIndex:windowId format", () => {
+    const result = adapter.get("3:42");
+    assert.equal(result.templateId, "safari.get_tab");
+    assert.equal(result.parameters.tabIndex, 3);
+    assert.equal(result.parameters.windowId, 42);
+  });
+
+  it("create returns open_url template", () => {
+    const result = adapter.create({ properties: { url: "https://example.com" } });
+    assert.equal(result.templateId, "safari.open_url");
+    assert.equal(result.parameters.url, "https://example.com");
+  });
+
+  it("update throws UnsupportedOperationError", () => {
+    assert.throws(
+      () => adapter.update({ id: "1", properties: {} }),
+      UnsupportedOperationError
+    );
+  });
+
+  it("delete returns close_tab template", () => {
+    const result = adapter.delete("2:10");
+    assert.equal(result.templateId, "safari.close_tab");
+    assert.equal(result.parameters.tabIndex, 2);
+  });
+
+  it("action do_javascript works", () => {
+    const result = adapter.action({ action: "do_javascript", parameters: { script: "document.title" } });
+    assert.equal(result.templateId, "safari.do_javascript");
+  });
+
+  it("action add_reading_list works", () => {
+    const result = adapter.action({ action: "add_reading_list", parameters: { url: "https://x.com" } });
+    assert.equal(result.templateId, "safari.add_reading_list");
   });
 
   it("action throws for unsupported", () => {

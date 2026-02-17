@@ -24,6 +24,7 @@ import {
   PhotosAdapter,
   MusicAdapter,
   FinderAdapter,
+  SafariAdapter,
 } from "./adapters/index.js";
 
 const VERSION = "0.2.0";
@@ -51,6 +52,7 @@ export function createServer(deps: ServerDeps): McpServer {
   appRegistry.register(new PhotosAdapter());
   appRegistry.register(new MusicAdapter());
   appRegistry.register(new FinderAdapter());
+  appRegistry.register(new SafariAdapter());
 
   const server = new McpServer(
     { name: "mcp-applescript", version: VERSION },

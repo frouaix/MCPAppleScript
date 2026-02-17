@@ -14,3 +14,4 @@ export { MessagesAdapter } from "./messages.js";
 export { PhotosAdapter } from "./photos.js";
 export { MusicAdapter } from "./music.js";
 export { FinderAdapter } from "./finder.js";
+export { SafariAdapter } from "./safari.js";
