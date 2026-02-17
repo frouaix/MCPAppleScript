@@ -6,6 +6,9 @@ import { RemindersAdapter } from "../../src/adapters/reminders.js";
 import { MailAdapter } from "../../src/adapters/mail.js";
 import { ContactsAdapter } from "../../src/adapters/contacts.js";
 import { MessagesAdapter } from "../../src/adapters/messages.js";
+import { PhotosAdapter } from "../../src/adapters/photos.js";
+import { MusicAdapter } from "../../src/adapters/music.js";
+import { FinderAdapter } from "../../src/adapters/finder.js";
 import { AppRegistry, UnsupportedOperationError } from "../../src/adapters/index.js";
 
 describe("NotesAdapter", () => {
@@ -247,6 +250,125 @@ describe("MessagesAdapter", () => {
   it("action send works", () => {
     const result = adapter.action({ action: "send", parameters: { to: "+1234", message: "hi" } });
     assert.equal(result.templateId, "messages.send");
+  });
+});
+
+describe("PhotosAdapter", () => {
+  const adapter = new PhotosAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "photos");
+    assert.equal(adapter.info.bundleId, "com.apple.Photos");
+    assert.equal(adapter.info.capabilities.update, false);
+    assert.equal(adapter.info.capabilities.delete, false);
+  });
+
+  it("listContainers returns albums template", () => {
+    assert.equal(adapter.listContainers().templateId, "photos.list_albums");
+  });
+
+  it("create returns create_album template", () => {
+    const result = adapter.create({ properties: { name: "Vacation" } });
+    assert.equal(result.templateId, "photos.create_album");
+    assert.equal(result.parameters.name, "Vacation");
+  });
+
+  it("update throws UnsupportedOperationError", () => {
+    assert.throws(
+      () => adapter.update({ id: "x", properties: {} }),
+      UnsupportedOperationError
+    );
+  });
+
+  it("action import works", () => {
+    const result = adapter.action({ action: "import", parameters: { filePath: "/tmp/photo.jpg" } });
+    assert.equal(result.templateId, "photos.import");
+  });
+});
+
+describe("MusicAdapter", () => {
+  const adapter = new MusicAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "music");
+    assert.equal(adapter.info.bundleId, "com.apple.Music");
+    assert.ok(adapter.info.capabilities.actions.includes("play"));
+    assert.ok(adapter.info.capabilities.actions.includes("now_playing"));
+  });
+
+  it("listContainers returns playlists template", () => {
+    assert.equal(adapter.listContainers().templateId, "music.list_playlists");
+  });
+
+  it("search passes query", () => {
+    const result = adapter.search({ query: "Beatles" });
+    assert.equal(result.templateId, "music.search_tracks");
+    assert.equal(result.parameters.query, "Beatles");
+  });
+
+  it("action play works", () => {
+    const result = adapter.action({ action: "play", parameters: { trackId: "123" } });
+    assert.equal(result.templateId, "music.play");
+  });
+
+  it("action now_playing works", () => {
+    const result = adapter.action({ action: "now_playing", parameters: {} });
+    assert.equal(result.templateId, "music.now_playing");
+  });
+
+  it("action throws for unsupported", () => {
+    assert.throws(
+      () => adapter.action({ action: "delete", parameters: {} }),
+      UnsupportedOperationError
+    );
+  });
+});
+
+describe("FinderAdapter", () => {
+  const adapter = new FinderAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "finder");
+    assert.equal(adapter.info.bundleId, "com.apple.finder");
+    assert.equal(adapter.info.itemType, "file");
+    assert.equal(adapter.info.containerType, "folder");
+  });
+
+  it("list defaults to home directory", () => {
+    const result = adapter.list({});
+    assert.equal(result.templateId, "finder.list_items");
+    assert.equal(result.parameters.path, "~");
+  });
+
+  it("get uses path as id", () => {
+    const result = adapter.get("/Users/test/file.txt");
+    assert.equal(result.templateId, "finder.get_item");
+    assert.equal(result.parameters.path, "/Users/test/file.txt");
+  });
+
+  it("create returns create_folder template", () => {
+    const result = adapter.create({ containerId: "/tmp", properties: { name: "test" } });
+    assert.equal(result.templateId, "finder.create_folder");
+    assert.equal(result.parameters.parentPath, "/tmp");
+    assert.equal(result.parameters.name, "test");
+  });
+
+  it("delete uses path as id", () => {
+    const result = adapter.delete("/tmp/old");
+    assert.equal(result.templateId, "finder.delete_item");
+    assert.equal(result.parameters.path, "/tmp/old");
+  });
+
+  it("action reveal works", () => {
+    const result = adapter.action({ action: "reveal", parameters: { path: "/tmp/x" } });
+    assert.equal(result.templateId, "finder.reveal");
+  });
+
+  it("action throws for unsupported", () => {
+    assert.throws(
+      () => adapter.action({ action: "play", parameters: {} }),
+      UnsupportedOperationError
+    );
   });
 });
 

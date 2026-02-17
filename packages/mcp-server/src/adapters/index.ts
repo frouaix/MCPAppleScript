@@ -11,3 +11,6 @@ export { RemindersAdapter } from "./reminders.js";
 export { MailAdapter } from "./mail.js";
 export { ContactsAdapter } from "./contacts.js";
 export { MessagesAdapter } from "./messages.js";
+export { PhotosAdapter } from "./photos.js";
+export { MusicAdapter } from "./music.js";
+export { FinderAdapter } from "./finder.js";

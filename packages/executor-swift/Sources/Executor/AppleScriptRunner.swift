@@ -86,6 +86,12 @@ enum AppleScriptRunner {
             return try ContactsTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         case "messages":
             return try MessagesTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "photos":
+            return try PhotosTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "music":
+            return try MusicTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "finder":
+            return try FinderTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         default:
             throw ExecutorError.invalidRequest("Unknown template prefix: \(prefix) (template: \(templateId))")
         }

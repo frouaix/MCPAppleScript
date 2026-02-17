@@ -21,6 +21,9 @@ import {
   MailAdapter,
   ContactsAdapter,
   MessagesAdapter,
+  PhotosAdapter,
+  MusicAdapter,
+  FinderAdapter,
 } from "./adapters/index.js";
 
 const VERSION = "0.2.0";
@@ -45,6 +48,9 @@ export function createServer(deps: ServerDeps): McpServer {
   appRegistry.register(new MailAdapter());
   appRegistry.register(new ContactsAdapter());
   appRegistry.register(new MessagesAdapter());
+  appRegistry.register(new PhotosAdapter());
+  appRegistry.register(new MusicAdapter());
+  appRegistry.register(new FinderAdapter());
 
   const server = new McpServer(
     { name: "mcp-applescript", version: VERSION },
