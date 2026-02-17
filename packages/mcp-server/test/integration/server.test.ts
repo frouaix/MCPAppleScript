@@ -34,6 +34,35 @@ function readResponse(child: ChildProcess): Promise<object> {
   });
 }
 
+/** Read messages until we get one with the expected JSON-RPC id. */
+function readResponseById(child: ChildProcess, id: number): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    const handler = (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const lines = buffer.split("\n");
+      // Process complete lines, keep last partial line in buffer
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line) as Record<string, unknown>;
+          if (msg["id"] === id) {
+            child.stdout!.off("data", handler);
+            resolve(msg);
+            return;
+          }
+          // Skip notifications and other messages
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+    };
+    child.stdout!.on("data", handler);
+    setTimeout(() => reject(new Error(`Timeout waiting for response id=${id}`)), 10000);
+  });
+}
+
 describe("MCP server integration", () => {
   let child: ChildProcess;
 
@@ -71,7 +100,7 @@ describe("MCP server integration", () => {
     assert.equal(serverInfo["name"], "mcp-applescript");
   });
 
-  it("should list tools after initialization", async () => {
+  it("should list only readonly tools by default", async () => {
     // Send initialized notification
     sendMessage(child, {
       jsonrpc: "2.0",
@@ -90,14 +119,15 @@ describe("MCP server integration", () => {
     assert.equal(response["id"], 2);
     const result = response["result"] as Record<string, unknown>;
     const tools = result["tools"] as Array<Record<string, unknown>>;
-    assert.ok(tools.length >= 5, `Expected at least 5 tools, got ${tools.length}`);
-
     const toolNames = tools.map((t) => t["name"]);
+
+    // Default mode is readonly — only 4 tools visible
+    assert.equal(tools.length, 4, `Expected 4 tools in readonly mode, got ${tools.length}: ${toolNames.join(", ")}`);
     assert.ok(toolNames.includes("applescript.ping"));
     assert.ok(toolNames.includes("applescript.list_apps"));
-    assert.ok(toolNames.includes("notes.create_note"));
-    assert.ok(toolNames.includes("calendar.create_event"));
-    assert.ok(toolNames.includes("mail.compose_draft"));
+    assert.ok(toolNames.includes("applescript.get_mode"));
+    assert.ok(toolNames.includes("applescript.set_mode"));
+    assert.ok(!toolNames.includes("notes.create_note"), "notes.create_note should not be visible in readonly");
   });
 
   it("should handle ping tool call", async () => {
@@ -120,5 +150,48 @@ describe("MCP server integration", () => {
     const parsed = JSON.parse(text);
     assert.equal(parsed.ok, true);
     assert.equal(parsed.version, "0.1.0");
+  });
+
+  it("should show all tools after switching to create mode", async () => {
+    // Switch to create mode — use readResponseById to skip the toolListChanged notification
+    const setModePromise = readResponseById(child, 4);
+    sendMessage(child, {
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: {
+        name: "applescript.set_mode",
+        arguments: { mode: "create" },
+      },
+    });
+
+    const setModeResult = await setModePromise;
+    const result = setModeResult["result"] as Record<string, unknown>;
+    const content = result["content"] as Array<Record<string, unknown>>;
+    const parsed = JSON.parse(content[0]!["text"] as string);
+    assert.equal(parsed.oldMode, "readonly");
+    assert.equal(parsed.newMode, "create");
+
+    // Wait for any remaining notification to flush
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Now list tools — should see create-level tools
+    const listPromise = readResponseById(child, 5);
+    sendMessage(child, {
+      jsonrpc: "2.0",
+      id: 5,
+      method: "tools/list",
+    });
+    const listResponse = await listPromise;
+    const listResult = listResponse["result"] as Record<string, unknown>;
+    const tools = listResult["tools"] as Array<Record<string, unknown>>;
+    const toolNames = tools.map((t) => t["name"]);
+
+    // Should now include create-level tools
+    assert.ok(toolNames.includes("notes.create_note"), "notes.create_note should be visible in create mode");
+    assert.ok(toolNames.includes("calendar.create_event"), "calendar.create_event should be visible in create mode");
+    assert.ok(toolNames.includes("mail.compose_draft"), "mail.compose_draft should be visible in create mode");
+    // But not full-mode tools
+    assert.ok(!toolNames.includes("applescript.run_script"), "run_script should not be visible in create mode");
   });
 });

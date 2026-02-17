@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { Config } from "./config/schema.js";
 import { PolicyEngine } from "./policy/policy.js";
@@ -6,6 +6,13 @@ import { runExecutor, ExecutorOptions } from "./exec/executor.js";
 import { ExecutorRequest } from "./exec/types.js";
 import { Logger } from "./util/logging.js";
 import { randomUUID } from "node:crypto";
+import {
+  ModeManager,
+  OperationMode,
+  ALL_MODES,
+  isToolAllowedInMode,
+} from "./mode/mode.js";
+import { ConfirmationManager } from "./mode/confirmation.js";
 
 const VERSION = "0.1.0";
 
@@ -18,6 +25,9 @@ export interface ServerDeps {
 export function createServer(deps: ServerDeps): McpServer {
   const { config, policy, logger } = deps;
 
+  const modeManager = new ModeManager(config.defaultMode);
+  const confirmation = new ConfirmationManager();
+
   const server = new McpServer(
     { name: "mcp-applescript", version: VERSION },
     { capabilities: { tools: {} } }
@@ -28,231 +38,368 @@ export function createServer(deps: ServerDeps): McpServer {
     logger,
   };
 
+  // Track registered tools for dynamic enable/disable
+  const registeredTools = new Map<string, RegisteredTool>();
+
+  function registerTool(name: string, tool: RegisteredTool): void {
+    registeredTools.set(name, tool);
+    // Disable tools not allowed in current mode at registration time
+    if (!isToolAllowedInMode(name, modeManager.getMode())) {
+      tool.disable();
+    }
+  }
+
+  function applyMode(): void {
+    for (const [name, tool] of registeredTools) {
+      if (isToolAllowedInMode(name, modeManager.getMode())) {
+        tool.enable();
+      } else {
+        tool.disable();
+      }
+    }
+  }
+
   // --- applescript.ping ---
-  server.tool("applescript.ping", "Check if the MCP-AppleScript server is running", async () => {
-    return {
-      content: [{ type: "text", text: JSON.stringify({ ok: true, version: VERSION }) }],
-    };
-  });
+  registerTool(
+    "applescript.ping",
+    server.tool(
+      "applescript.ping",
+      "Check if the MCP-AppleScript server is running",
+      { readOnlyHint: true },
+      async () => ({
+        content: [{ type: "text", text: JSON.stringify({ ok: true, version: VERSION }) }],
+      })
+    )
+  );
 
   // --- applescript.list_apps ---
-  server.tool("applescript.list_apps", "List configured apps and their policy status", async () => {
-    const apps = policy.getConfiguredApps().map((a) => ({
-      bundleId: a.bundleId,
-      enabled: a.config.enabled,
-      allowedTools: a.config.allowedTools,
-    }));
-    return {
-      content: [{ type: "text", text: JSON.stringify({ apps }, null, 2) }],
-    };
-  });
-
-  // --- notes.create_note ---
-  server.tool(
-    "notes.create_note",
-    "Create a new note in Apple Notes",
-    { title: z.string().describe("Title of the note"), body: z.string().describe("Body content") },
-    async ({ title, body }) => {
-      const bundleId = "com.apple.Notes";
-      policy.assertAllowed({ toolName: "notes.create_note", bundleId });
-
-      const request: ExecutorRequest = {
-        requestId: randomUUID(),
-        bundleId,
-        mode: "template",
-        templateId: "notes.create_note.v1",
-        parameters: { title, body },
-        timeoutMs: config.defaultTimeoutMs,
-      };
-
-      const response = await runExecutor(request, executorOptions);
-      if (!response.ok) {
+  registerTool(
+    "applescript.list_apps",
+    server.tool(
+      "applescript.list_apps",
+      "List configured apps and their policy status",
+      { readOnlyHint: true },
+      async () => {
+        const apps = policy.getConfiguredApps().map((a) => ({
+          bundleId: a.bundleId,
+          enabled: a.config.enabled,
+          allowedTools: a.config.allowedTools,
+        }));
         return {
-          content: [{ type: "text", text: `Error: ${response.error.message}` }],
-          isError: true,
+          content: [{ type: "text", text: JSON.stringify({ apps }, null, 2) }],
         };
       }
+    )
+  );
 
-      return {
-        content: [
-          { type: "text", text: `Created note "${title}"` },
-          { type: "text", text: JSON.stringify(response.result) },
-        ],
-      };
-    }
+  // --- applescript.get_mode ---
+  registerTool(
+    "applescript.get_mode",
+    server.tool(
+      "applescript.get_mode",
+      "Get the current operation mode (readonly, create, or full)",
+      { readOnlyHint: true },
+      async () => {
+        const mode = modeManager.getMode();
+        const enabledTools = modeManager.getEnabledTools();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ mode, enabledTools, allModes: ALL_MODES }, null, 2),
+            },
+          ],
+        };
+      }
+    )
+  );
+
+  // --- applescript.set_mode ---
+  registerTool(
+    "applescript.set_mode",
+    server.tool(
+      "applescript.set_mode",
+      "Change the operation mode (readonly: read-only, create: allow creation, full: all operations including destructive)",
+      {
+        mode: z
+          .enum(["readonly", "create", "full"])
+          .describe("The operation mode to switch to"),
+      },
+      { readOnlyHint: false, destructiveHint: false },
+      async ({ mode: newMode }) => {
+        const { oldMode } = modeManager.setMode(newMode as OperationMode);
+        applyMode();
+        // Notify client that tool list changed
+        server.sendToolListChanged();
+
+        const enabledTools = modeManager.getEnabledTools();
+        const disabledTools = modeManager.getDisabledTools();
+        logger.info("Mode changed", { oldMode, newMode, enabledTools });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { oldMode, newMode, enabledTools, disabledTools },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+    )
+  );
+
+  // --- notes.create_note ---
+  registerTool(
+    "notes.create_note",
+    server.tool(
+      "notes.create_note",
+      "Create a new note in Apple Notes",
+      { title: z.string().describe("Title of the note"), body: z.string().describe("Body content") },
+      { readOnlyHint: false, destructiveHint: false },
+      async ({ title, body }) => {
+        const bundleId = "com.apple.Notes";
+        policy.assertAllowed({ toolName: "notes.create_note", bundleId });
+
+        const request: ExecutorRequest = {
+          requestId: randomUUID(),
+          bundleId,
+          mode: "template",
+          templateId: "notes.create_note.v1",
+          parameters: { title, body },
+          timeoutMs: config.defaultTimeoutMs,
+        };
+
+        const response = await runExecutor(request, executorOptions);
+        if (!response.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${response.error.message}` }],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            { type: "text", text: `Created note "${title}"` },
+            { type: "text", text: JSON.stringify(response.result) },
+          ],
+        };
+      }
+    )
   );
 
   // --- calendar.create_event ---
-  server.tool(
+  registerTool(
     "calendar.create_event",
-    "Create a new event in Apple Calendar",
-    {
-      title: z.string().describe("Event title"),
-      start: z.string().describe("Start date/time (ISO 8601 or natural language)"),
-      end: z.string().describe("End date/time (ISO 8601 or natural language)"),
-      calendarName: z.string().optional().describe("Calendar name (default: Calendar)"),
-      location: z.string().optional().describe("Event location"),
-      notes: z.string().optional().describe("Event notes"),
-    },
-    async ({ title, start, end, calendarName, location, notes }) => {
-      const bundleId = "com.apple.iCal";
-      policy.assertAllowed({ toolName: "calendar.create_event", bundleId });
+    server.tool(
+      "calendar.create_event",
+      "Create a new event in Apple Calendar",
+      {
+        title: z.string().describe("Event title"),
+        start: z.string().describe("Start date/time (ISO 8601 or natural language)"),
+        end: z.string().describe("End date/time (ISO 8601 or natural language)"),
+        calendarName: z.string().optional().describe("Calendar name (default: Calendar)"),
+        location: z.string().optional().describe("Event location"),
+        notes: z.string().optional().describe("Event notes"),
+      },
+      { readOnlyHint: false, destructiveHint: false },
+      async ({ title, start, end, calendarName, location, notes }) => {
+        const bundleId = "com.apple.iCal";
+        policy.assertAllowed({ toolName: "calendar.create_event", bundleId });
 
-      const request: ExecutorRequest = {
-        requestId: randomUUID(),
-        bundleId,
-        mode: "template",
-        templateId: "calendar.create_event.v1",
-        parameters: {
-          title,
-          start,
-          end,
-          calendarName: calendarName ?? "Calendar",
-          location: location ?? "",
-          notes: notes ?? "",
-        },
-        timeoutMs: config.defaultTimeoutMs,
-      };
+        const request: ExecutorRequest = {
+          requestId: randomUUID(),
+          bundleId,
+          mode: "template",
+          templateId: "calendar.create_event.v1",
+          parameters: {
+            title,
+            start,
+            end,
+            calendarName: calendarName ?? "Calendar",
+            location: location ?? "",
+            notes: notes ?? "",
+          },
+          timeoutMs: config.defaultTimeoutMs,
+        };
 
-      const response = await runExecutor(request, executorOptions);
-      if (!response.ok) {
+        const response = await runExecutor(request, executorOptions);
+        if (!response.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${response.error.message}` }],
+            isError: true,
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: ${response.error.message}` }],
-          isError: true,
+          content: [
+            { type: "text", text: `Created event "${title}" from ${start} to ${end}` },
+            { type: "text", text: JSON.stringify(response.result) },
+          ],
         };
       }
-
-      return {
-        content: [
-          { type: "text", text: `Created event "${title}" from ${start} to ${end}` },
-          { type: "text", text: JSON.stringify(response.result) },
-        ],
-      };
-    }
+    )
   );
 
   // --- mail.compose_draft ---
-  server.tool(
+  registerTool(
     "mail.compose_draft",
-    "Compose a new email draft in Apple Mail",
-    {
-      to: z.string().describe("Recipient email address"),
-      subject: z.string().optional().describe("Email subject"),
-      body: z.string().optional().describe("Email body"),
-    },
-    async ({ to, subject, body }) => {
-      const bundleId = "com.apple.mail";
-      policy.assertAllowed({ toolName: "mail.compose_draft", bundleId });
+    server.tool(
+      "mail.compose_draft",
+      "Compose a new email draft in Apple Mail",
+      {
+        to: z.string().describe("Recipient email address"),
+        subject: z.string().optional().describe("Email subject"),
+        body: z.string().optional().describe("Email body"),
+      },
+      { readOnlyHint: false, destructiveHint: false },
+      async ({ to, subject, body }) => {
+        const bundleId = "com.apple.mail";
+        policy.assertAllowed({ toolName: "mail.compose_draft", bundleId });
 
-      const request: ExecutorRequest = {
-        requestId: randomUUID(),
-        bundleId,
-        mode: "template",
-        templateId: "mail.compose_draft.v1",
-        parameters: {
-          to,
-          subject: subject ?? "",
-          body: body ?? "",
-        },
-        timeoutMs: config.defaultTimeoutMs,
-      };
+        const request: ExecutorRequest = {
+          requestId: randomUUID(),
+          bundleId,
+          mode: "template",
+          templateId: "mail.compose_draft.v1",
+          parameters: {
+            to,
+            subject: subject ?? "",
+            body: body ?? "",
+          },
+          timeoutMs: config.defaultTimeoutMs,
+        };
 
-      const response = await runExecutor(request, executorOptions);
-      if (!response.ok) {
+        const response = await runExecutor(request, executorOptions);
+        if (!response.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${response.error.message}` }],
+            isError: true,
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: ${response.error.message}` }],
-          isError: true,
+          content: [
+            { type: "text", text: `Created email draft to ${to}` },
+            { type: "text", text: JSON.stringify(response.result) },
+          ],
         };
       }
-
-      return {
-        content: [
-          { type: "text", text: `Created email draft to ${to}` },
-          { type: "text", text: JSON.stringify(response.result) },
-        ],
-      };
-    }
+    )
   );
 
   // --- applescript.run_template ---
-  server.tool(
+  registerTool(
     "applescript.run_template",
-    "Execute a registered AppleScript template by ID (policy-gated)",
-    {
-      templateId: z.string().describe("Template identifier (e.g. notes.create_note.v1)"),
-      bundleId: z.string().describe("Target app bundle ID (e.g. com.apple.Notes)"),
-      parameters: z.record(z.unknown()).optional().describe("Template parameters"),
-    },
-    async ({ templateId, bundleId, parameters }) => {
-      policy.assertAllowed({ toolName: "applescript.run_template", bundleId });
+    server.tool(
+      "applescript.run_template",
+      "Execute a registered AppleScript template by ID (policy-gated)",
+      {
+        templateId: z.string().describe("Template identifier (e.g. notes.create_note.v1)"),
+        bundleId: z.string().describe("Target app bundle ID (e.g. com.apple.Notes)"),
+        parameters: z.record(z.unknown()).optional().describe("Template parameters"),
+      },
+      { readOnlyHint: false, destructiveHint: true },
+      async ({ templateId, bundleId, parameters }) => {
+        policy.assertAllowed({ toolName: "applescript.run_template", bundleId });
 
-      const request: ExecutorRequest = {
-        requestId: randomUUID(),
-        bundleId,
-        mode: "template",
-        templateId,
-        parameters: parameters ?? {},
-        timeoutMs: config.defaultTimeoutMs,
-      };
+        const request: ExecutorRequest = {
+          requestId: randomUUID(),
+          bundleId,
+          mode: "template",
+          templateId,
+          parameters: parameters ?? {},
+          timeoutMs: config.defaultTimeoutMs,
+        };
 
-      const response = await runExecutor(request, executorOptions);
-      if (!response.ok) {
+        const response = await runExecutor(request, executorOptions);
+        if (!response.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${response.error.message}` }],
+            isError: true,
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: ${response.error.message}` }],
-          isError: true,
+          content: [
+            { type: "text", text: `Template ${templateId} executed successfully` },
+            { type: "text", text: JSON.stringify(response.result) },
+          ],
         };
       }
-
-      return {
-        content: [
-          { type: "text", text: `Template ${templateId} executed successfully` },
-          { type: "text", text: JSON.stringify(response.result) },
-        ],
-      };
-    }
+    )
   );
 
   // --- applescript.run_script ---
-  server.tool(
+  registerTool(
     "applescript.run_script",
-    "Execute raw AppleScript (disabled by default, requires explicit config)",
-    {
-      script: z.string().describe("AppleScript source code to execute"),
-      bundleId: z.string().optional().describe("Target app bundle ID for policy check"),
-    },
-    async ({ script, bundleId }) => {
-      policy.assertAllowed({ toolName: "applescript.run_script", bundleId });
+    server.tool(
+      "applescript.run_script",
+      "Execute raw AppleScript (requires full mode + explicit config). May cause data loss — confirmation required.",
+      {
+        script: z.string().describe("AppleScript source code to execute"),
+        bundleId: z.string().optional().describe("Target app bundle ID for policy check"),
+        confirmationToken: z
+          .string()
+          .optional()
+          .describe("Confirmation token from a previous call (required if elicitation unavailable)"),
+      },
+      { readOnlyHint: false, destructiveHint: true },
+      async ({ script, bundleId, confirmationToken }) => {
+        policy.assertAllowed({ toolName: "applescript.run_script", bundleId });
 
-      const request: ExecutorRequest = {
-        requestId: randomUUID(),
-        bundleId: bundleId ?? "com.apple.systemevents",
-        mode: "raw",
-        script,
-        parameters: {},
-        timeoutMs: config.defaultTimeoutMs,
-      };
+        // Require confirmation for destructive action
+        const confirmResult = await confirmation.requestConfirmation(
+          "applescript.run_script",
+          `Execute raw AppleScript targeting ${bundleId ?? "system"}:\n${script.slice(0, 200)}${script.length > 200 ? "..." : ""}`,
+          confirmationToken
+        );
 
-      const response = await runExecutor(request, executorOptions);
-      if (!response.ok) {
+        if (!confirmResult.confirmed) {
+          return {
+            content: [{ type: "text", text: confirmResult.message }],
+          };
+        }
+
+        const request: ExecutorRequest = {
+          requestId: randomUUID(),
+          bundleId: bundleId ?? "com.apple.systemevents",
+          mode: "raw",
+          script,
+          parameters: {},
+          timeoutMs: config.defaultTimeoutMs,
+        };
+
+        const response = await runExecutor(request, executorOptions);
+        if (!response.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${response.error.message}` }],
+            isError: true,
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: ${response.error.message}` }],
-          isError: true,
+          content: [
+            { type: "text", text: "Script executed successfully" },
+            { type: "text", text: JSON.stringify(response.result) },
+          ],
         };
       }
-
-      return {
-        content: [
-          { type: "text", text: "Script executed successfully" },
-          { type: "text", text: JSON.stringify(response.result) },
-        ],
-      };
-    }
+    )
   );
+
+  // Attach the low-level server to the confirmation manager for elicitation
+  confirmation.attachServer(server.server);
 
   logger.info("MCP server created", {
     version: VERSION,
+    mode: modeManager.getMode(),
     executorPath: config.executorPath,
-    toolCount: 7,
+    toolCount: registeredTools.size,
+    enabledTools: modeManager.getEnabledTools(),
   });
 
   return server;

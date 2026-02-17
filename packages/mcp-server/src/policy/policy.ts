@@ -1,6 +1,7 @@
 import { Config, AppConfig } from "../config/schema.js";
 import { PolicyDeniedError } from "../util/errors.js";
 import { Logger } from "../util/logging.js";
+import { ModeManager, isToolAllowedInMode } from "../mode/mode.js";
 
 export interface PolicyContext {
   toolName: string;
@@ -11,14 +12,35 @@ export interface PolicyContext {
 export class PolicyEngine {
   private readonly config: Config;
   private readonly logger: Logger;
+  private modeManager: ModeManager | undefined;
 
   constructor(config: Config, logger: Logger) {
     this.config = config;
     this.logger = logger;
   }
 
+  /** Attach a ModeManager for mode-based enforcement. */
+  setModeManager(modeManager: ModeManager): void {
+    this.modeManager = modeManager;
+  }
+
   assertAllowed(ctx: PolicyContext): void {
     const { toolName, bundleId } = ctx;
+
+    // Mode check: reject tools not allowed in current mode
+    if (this.modeManager) {
+      const mode = this.modeManager.getMode();
+      if (!isToolAllowedInMode(toolName, mode)) {
+        this.logger.warn("Policy denied: tool not allowed in current mode", {
+          toolName,
+          mode,
+        });
+        throw new PolicyDeniedError(
+          `Tool ${toolName} is not available in "${mode}" mode. Change mode with applescript.set_mode.`,
+          { toolName, mode }
+        );
+      }
+    }
 
     // run_script requires explicit enablement
     if (toolName === "applescript.run_script") {

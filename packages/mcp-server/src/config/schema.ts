@@ -21,9 +21,12 @@ export const LoggingConfigSchema = z.object({
 
 export type LoggingConfig = z.infer<typeof LoggingConfigSchema>;
 
+export const OperationModeSchema = z.enum(["readonly", "create", "full"]).default("readonly");
+
 export const ConfigSchema = z.object({
   executorPath: z.string().default("applescript-executor"),
   defaultTimeoutMs: z.number().int().positive().default(12000),
+  defaultMode: OperationModeSchema.default("readonly"),
   apps: z.record(z.string(), AppConfigSchema).default({}),
   runScript: RunScriptConfigSchema.default({}),
   logging: LoggingConfigSchema.default({}),
