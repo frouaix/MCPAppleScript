@@ -44,14 +44,41 @@ In **full** mode, destructive tools (like `run_script`) require user confirmatio
 ## Requirements
 
 - macOS 12.0 or later
-- Node.js 20+
-- Swift 5.9+ (for building the executor)
-- pnpm 8+
+- Node.js 20+ (only for building from source)
+- Swift 5.9+ (only for building from source)
+- pnpm 8+ (only for building from source)
 
-## Quick Start
+## Installation
+
+### Option 1: Download pre-built binary (.dmg)
+
+Download the latest `.dmg` from [GitHub Releases](https://github.com/frouaix/MCPAppleScript/releases):
+
+1. Open the `.dmg` and copy `mcp-applescript` to `/usr/local/bin/`:
+   ```bash
+   sudo cp /Volumes/MCP-AppleScript\ */mcp-applescript /usr/local/bin/
+   ```
+2. Create a config file:
+   ```bash
+   mkdir -p ~/.config/applescript-mcp
+   cat > ~/.config/applescript-mcp/config.json << 'EOF'
+   {
+     "defaultMode": "readonly",
+     "apps": {
+       "com.apple.Notes": { "enabled": true, "allowedTools": ["notes.create_note"] },
+       "com.apple.iCal": { "enabled": true, "allowedTools": ["calendar.create_event"] },
+       "com.apple.mail": { "enabled": true, "allowedTools": ["mail.compose_draft"] }
+     }
+   }
+   EOF
+   ```
+3. Add to your MCP client config (see Claude Desktop below)
+
+The pre-built binary is a self-contained executable with Node.js and the Swift executor embedded — no runtime dependencies required.
+
+### Option 2: Build from source
 
 ```bash
-# Clone and install
 git clone https://github.com/frouaix/MCPAppleScript.git
 cd MCPAppleScript
 ./install.sh
@@ -67,6 +94,17 @@ The install script will:
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
+```json
+{
+  "mcpServers": {
+    "applescript": {
+      "command": "/usr/local/bin/mcp-applescript"
+    }
+  }
+}
+```
+
+If building from source, use the dev path instead:
 ```json
 {
   "mcpServers": {
@@ -165,6 +203,18 @@ cd packages/executor-swift && swift build
 cd packages/mcp-server && pnpm dev
 ```
 
+### Building the standalone binary
+
+```bash
+# Build self-contained binary (Node.js SEA + embedded Swift executor)
+pnpm build:sea
+
+# Package as .dmg
+pnpm build:dmg
+```
+
+Output: `dist/mcp-applescript` (~107MB, ~40MB as .dmg)
+
 ## Security
 
 - **Three operation modes** (readonly → create → full) with safe default
@@ -185,6 +235,7 @@ MCPAppleScript/
       src/
         index.ts         # Stdio entrypoint
         server.ts        # MCP server + tool registration
+        sea.ts           # SEA binary support (executor extraction)
         config/          # Configuration loading + Zod schemas
         mode/            # Operation mode manager + confirmation
         policy/          # Allowlist/denylist enforcement
@@ -197,8 +248,11 @@ MCPAppleScript/
         AppTargeting.swift       # Bundle ID handling
         Errors.swift     # Error code mapping
         JsonIO.swift     # Stdin/stdout JSON I/O
+  scripts/
+    build-sea.sh         # Build self-contained binary (Node.js SEA)
+    build-dmg.sh         # Package binary as .dmg
   docs/                  # Architecture documentation
-  install.sh             # One-step installer
+  install.sh             # One-step installer (build from source)
 ```
 
 ## License

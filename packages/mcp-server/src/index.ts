@@ -5,13 +5,26 @@ import { loadConfig } from "./config/config.js";
 import { PolicyEngine } from "./policy/policy.js";
 import { Logger } from "./util/logging.js";
 import { createServer } from "./server.js";
+import { isSea, extractExecutor } from "./sea.js";
 
 async function main() {
   const config = loadConfig();
+
+  // When running as SEA, override executor path with the extracted binary
+  if (isSea()) {
+    const extractedPath = extractExecutor();
+    if (extractedPath) {
+      config.executorPath = extractedPath;
+    }
+  }
+
   const logger = new Logger(config.logging);
   const policy = new PolicyEngine(config, logger);
 
-  logger.info("Starting MCP-AppleScript server");
+  logger.info("Starting MCP-AppleScript server", {
+    sea: isSea(),
+    executorPath: config.executorPath,
+  });
 
   const server = createServer({ config, policy, logger });
   const transport = new StdioServerTransport();
