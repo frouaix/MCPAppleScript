@@ -80,6 +80,12 @@ enum AppleScriptRunner {
             return try CalendarTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         case "reminders":
             return try RemindersTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "mail":
+            return try MailTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "contacts":
+            return try ContactsTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        case "messages":
+            return try MessagesTemplates.build(templateId: templateId, bundleId: bundleId, parameters: parameters)
         default:
             throw ExecutorError.invalidRequest("Unknown template prefix: \(prefix) (template: \(templateId))")
         }

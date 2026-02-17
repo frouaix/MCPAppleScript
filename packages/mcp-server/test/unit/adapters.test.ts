@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { NotesAdapter } from "../../src/adapters/notes.js";
 import { CalendarAdapter } from "../../src/adapters/calendar.js";
 import { RemindersAdapter } from "../../src/adapters/reminders.js";
+import { MailAdapter } from "../../src/adapters/mail.js";
+import { ContactsAdapter } from "../../src/adapters/contacts.js";
+import { MessagesAdapter } from "../../src/adapters/messages.js";
 import { AppRegistry, UnsupportedOperationError } from "../../src/adapters/index.js";
 
 describe("NotesAdapter", () => {
@@ -136,6 +139,114 @@ describe("RemindersAdapter", () => {
       () => adapter.action({ action: "play", parameters: {} }),
       UnsupportedOperationError
     );
+  });
+});
+
+describe("MailAdapter", () => {
+  const adapter = new MailAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "mail");
+    assert.equal(adapter.info.bundleId, "com.apple.mail");
+    assert.equal(adapter.info.itemType, "message");
+    assert.equal(adapter.info.containerType, "mailbox");
+  });
+
+  it("listContainers returns mailboxes template", () => {
+    assert.equal(adapter.listContainers().templateId, "mail.list_mailboxes");
+  });
+
+  it("list defaults to INBOX", () => {
+    const result = adapter.list({});
+    assert.equal(result.templateId, "mail.list_messages");
+    assert.equal(result.parameters.mailboxName, "INBOX");
+  });
+
+  it("create returns draft template", () => {
+    const result = adapter.create({ properties: { to: "a@b.com", subject: "Hi" } });
+    assert.equal(result.templateId, "mail.create_draft");
+    assert.equal(result.parameters.to, "a@b.com");
+  });
+
+  it("action send works", () => {
+    const result = adapter.action({ action: "send", parameters: { to: "x@y.com", body: "hi" } });
+    assert.equal(result.templateId, "mail.send");
+  });
+
+  it("action throws for unsupported", () => {
+    assert.throws(
+      () => adapter.action({ action: "play", parameters: {} }),
+      UnsupportedOperationError
+    );
+  });
+});
+
+describe("ContactsAdapter", () => {
+  const adapter = new ContactsAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "contacts");
+    assert.equal(adapter.info.bundleId, "com.apple.Contacts");
+    assert.equal(adapter.info.itemType, "person");
+    assert.equal(adapter.info.containerType, "group");
+  });
+
+  it("listContainers returns groups template", () => {
+    assert.equal(adapter.listContainers().templateId, "contacts.list_groups");
+  });
+
+  it("create passes properties", () => {
+    const result = adapter.create({ properties: { firstName: "John", lastName: "Doe" } });
+    assert.equal(result.templateId, "contacts.create_person");
+    assert.equal(result.parameters.firstName, "John");
+  });
+
+  it("search passes query", () => {
+    const result = adapter.search({ query: "Smith" });
+    assert.equal(result.templateId, "contacts.search_people");
+    assert.equal(result.parameters.query, "Smith");
+  });
+});
+
+describe("MessagesAdapter", () => {
+  const adapter = new MessagesAdapter();
+
+  it("has correct info", () => {
+    assert.equal(adapter.info.name, "messages");
+    assert.equal(adapter.info.bundleId, "com.apple.MobileSMS");
+    assert.equal(adapter.info.capabilities.create, false);
+    assert.equal(adapter.info.capabilities.update, false);
+    assert.equal(adapter.info.capabilities.delete, false);
+  });
+
+  it("listContainers returns chats template", () => {
+    assert.equal(adapter.listContainers().templateId, "messages.list_chats");
+  });
+
+  it("create throws UnsupportedOperationError", () => {
+    assert.throws(
+      () => adapter.create({ properties: {} }),
+      UnsupportedOperationError
+    );
+  });
+
+  it("update throws UnsupportedOperationError", () => {
+    assert.throws(
+      () => adapter.update({ id: "x", properties: {} }),
+      UnsupportedOperationError
+    );
+  });
+
+  it("delete throws UnsupportedOperationError", () => {
+    assert.throws(
+      () => adapter.delete("x"),
+      UnsupportedOperationError
+    );
+  });
+
+  it("action send works", () => {
+    const result = adapter.action({ action: "send", parameters: { to: "+1234", message: "hi" } });
+    assert.equal(result.templateId, "messages.send");
   });
 });
 

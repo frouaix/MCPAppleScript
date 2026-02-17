@@ -18,6 +18,9 @@ import {
   NotesAdapter,
   CalendarAdapter,
   RemindersAdapter,
+  MailAdapter,
+  ContactsAdapter,
+  MessagesAdapter,
 } from "./adapters/index.js";
 
 const VERSION = "0.2.0";
@@ -39,6 +42,9 @@ export function createServer(deps: ServerDeps): McpServer {
   appRegistry.register(new NotesAdapter());
   appRegistry.register(new CalendarAdapter());
   appRegistry.register(new RemindersAdapter());
+  appRegistry.register(new MailAdapter());
+  appRegistry.register(new ContactsAdapter());
+  appRegistry.register(new MessagesAdapter());
 
   const server = new McpServer(
     { name: "mcp-applescript", version: VERSION },

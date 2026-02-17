@@ -8,3 +8,6 @@ export { AppRegistry } from "./registry.js";
 export { NotesAdapter } from "./notes.js";
 export { CalendarAdapter } from "./calendar.js";
 export { RemindersAdapter } from "./reminders.js";
+export { MailAdapter } from "./mail.js";
+export { ContactsAdapter } from "./contacts.js";
+export { MessagesAdapter } from "./messages.js";
