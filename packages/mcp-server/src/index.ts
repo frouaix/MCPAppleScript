@@ -1,18 +1,26 @@
 #!/usr/bin/env node
 
-/**
- * MCP-AppleScript Server Entry Point
- * 
- * This is the main entry point for the MCP server that provides
- * controlled AppleScript automation capabilities.
- */
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { loadConfig } from "./config/config.js";
+import { PolicyEngine } from "./policy/policy.js";
+import { Logger } from "./util/logging.js";
+import { createServer } from "./server.js";
 
-console.log("MCP-AppleScript server starting...");
-console.log("Version: 0.1.0");
+async function main() {
+  const config = loadConfig();
+  const logger = new Logger(config.logging);
+  const policy = new PolicyEngine(config, logger);
 
-// TODO: Initialize MCP server with stdio transport
-// TODO: Register tools
-// TODO: Load configuration
-// TODO: Start server
+  logger.info("Starting MCP-AppleScript server");
 
-process.exit(0);
+  const server = createServer({ config, policy, logger });
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
+  logger.info("MCP-AppleScript server running on stdio");
+}
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
