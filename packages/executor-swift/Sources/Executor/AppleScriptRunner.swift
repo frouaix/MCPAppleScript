@@ -23,7 +23,9 @@ enum AppleScriptRunner {
     /// Builds a script from a template ID and parameters, then executes it.
     static func executeTemplate(templateId: String, bundleId: String, parameters: [String: Any]) throws -> [String: Any] {
         let script = try buildTemplateScript(templateId: templateId, bundleId: bundleId, parameters: parameters)
-        return try execute(script: script)
+        let wrappedScript = JsonEscape.wrapScript(script)
+        let rawResult = try execute(script: wrappedScript)
+        return JsonEscape.reserialize(rawResult)
     }
 
     /// Converts an NSAppleEventDescriptor to a Swift dictionary representation.
@@ -66,7 +68,8 @@ enum AppleScriptRunner {
 
     /// Builds an AppleScript string from a template identifier and parameters (public for dryRun).
     static func buildScript(templateId: String, bundleId: String, parameters: [String: Any]) throws -> String {
-        return try buildTemplateScript(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        let script = try buildTemplateScript(templateId: templateId, bundleId: bundleId, parameters: parameters)
+        return JsonEscape.wrapScript(script)
     }
 
     /// Builds an AppleScript string from a template identifier and parameters.

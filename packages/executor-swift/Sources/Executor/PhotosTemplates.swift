@@ -37,7 +37,7 @@ enum PhotosTemplates {
             set output to "["
             repeat with i from 1 to count of albumList
                 set a to item i of albumList
-                set output to output & "{\\"id\\":\\"" & albumId of a & "\\",\\"name\\":\\"" & albumName of a & "\\",\\"type\\":\\"album\\",\\"itemCount\\":" & (mediaCount of a as text) & "}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(albumId of a) & "\\",\\"name\\":\\"" & my jsonEsc(albumName of a) & "\\",\\"type\\":\\"album\\",\\"itemCount\\":" & (mediaCount of a as text) & "}"
                 if i < (count of albumList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -74,7 +74,7 @@ enum PhotosTemplates {
                     set mDate to date of m as «class isot» as string
                     set mWidth to width of m
                     set mHeight to height of m
-                    set output to output & "{\\"id\\":\\"" & mId & "\\",\\"name\\":\\"" & mName & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & mDate & "\\",\\"width\\":" & mWidth & ",\\"height\\":" & mHeight & "}}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(mId) & "\\",\\"name\\":\\"" & my jsonEsc(mName) & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & my jsonEsc(mDate) & "\\",\\"width\\":" & mWidth & ",\\"height\\":" & mHeight & "}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -99,7 +99,7 @@ enum PhotosTemplates {
             set mFav to favorite of m
             set mDesc to description of m
             set mLoc to location of m
-            return "{\\"id\\":\\"" & mId & "\\",\\"name\\":\\"" & mName & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & mDate & "\\",\\"width\\":" & mWidth & ",\\"height\\":" & mHeight & ",\\"favorite\\":" & mFav & ",\\"description\\":\\"" & mDesc & "\\"}}"
+            return "{\\"id\\":\\"" & my jsonEsc(mId) & "\\",\\"name\\":\\"" & my jsonEsc(mName) & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & my jsonEsc(mDate) & "\\",\\"width\\":" & mWidth & ",\\"height\\":" & mHeight & ",\\"favorite\\":" & mFav & ",\\"description\\":\\"" & my jsonEsc(mDesc) & "\\"}}"
         end tell
         """
     }
@@ -121,7 +121,7 @@ enum PhotosTemplates {
                 set mId to id of m
                 set mName to filename of m
                 set mDate to date of m as «class isot» as string
-                set output to output & "{\\"id\\":\\"" & mId & "\\",\\"name\\":\\"" & mName & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & mDate & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(mId) & "\\",\\"name\\":\\"" & my jsonEsc(mName) & "\\",\\"type\\":\\"media\\",\\"properties\\":{\\"date\\":\\"" & my jsonEsc(mDate) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -140,7 +140,7 @@ enum PhotosTemplates {
         tell application id "\(bundleId)"
             set newAlbum to make new album named "\(esc(name))"
             set aId to id of newAlbum
-            return "{\\"id\\":\\"" & aId & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"album\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(aId) & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"album\\"}"
         end tell
         """
     }

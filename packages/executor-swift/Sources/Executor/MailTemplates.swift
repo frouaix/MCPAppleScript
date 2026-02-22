@@ -41,7 +41,7 @@ enum MailTemplates {
             set output to "["
             repeat with i from 1 to count of mboxList
                 set m to item i of mboxList
-                set output to output & "{\\"id\\":\\"" & acctName of m & "/" & mboxName of m & "\\",\\"name\\":\\"" & mboxName of m & "\\",\\"type\\":\\"mailbox\\",\\"itemCount\\":" & (msgCount of m as text) & ",\\"properties\\":{\\"account\\":\\"" & acctName of m & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(acctName of m) & "/" & my jsonEsc(mboxName of m) & "\\",\\"name\\":\\"" & my jsonEsc(mboxName of m) & "\\",\\"type\\":\\"mailbox\\",\\"itemCount\\":" & (msgCount of m as text) & ",\\"properties\\":{\\"account\\":\\"" & my jsonEsc(acctName of m) & "\\"}}"
                 if i < (count of mboxList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -72,7 +72,7 @@ enum MailTemplates {
                     set mSender to sender of m
                     set mDate to date received of m as «class isot» as string
                     set mRead to read status of m
-                    set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"" & mSubject & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & mSender & "\\",\\"dateReceived\\":\\"" & mDate & "\\",\\"read\\":" & mRead & "}}"
+                    set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"" & my jsonEsc(mSubject) & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & my jsonEsc(mSender) & "\\",\\"dateReceived\\":\\"" & my jsonEsc(mDate) & "\\",\\"read\\":" & mRead & "}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -100,7 +100,7 @@ enum MailTemplates {
                 if recipList is not "" then set recipList to recipList & ", "
                 set recipList to recipList & address of r
             end repeat
-            return "{\\"id\\":" & mId & ",\\"name\\":\\"" & mSubject & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & mSender & "\\",\\"to\\":\\"" & recipList & "\\",\\"dateReceived\\":\\"" & mDate & "\\",\\"read\\":" & mRead & ",\\"body\\":\\"" & mContent & "\\"}}"
+            return "{\\"id\\":" & mId & ",\\"name\\":\\"" & my jsonEsc(mSubject) & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & my jsonEsc(mSender) & "\\",\\"to\\":\\"" & my jsonEsc(recipList) & "\\",\\"dateReceived\\":\\"" & my jsonEsc(mDate) & "\\",\\"read\\":" & mRead & ",\\"body\\":\\"" & my jsonEsc(mContent) & "\\"}}"
         end tell
         """
     }
@@ -132,7 +132,7 @@ enum MailTemplates {
                 set mSubject to subject of m
                 set mSender to sender of m
                 set mDate to date received of m as «class isot» as string
-                set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"" & mSubject & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & mSender & "\\",\\"dateReceived\\":\\"" & mDate & "\\"}}"
+                set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"" & my jsonEsc(mSubject) & "\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & my jsonEsc(mSender) & "\\",\\"dateReceived\\":\\"" & my jsonEsc(mDate) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -156,7 +156,7 @@ enum MailTemplates {
             tell newMessage
                 make new to recipient at end of to recipients with properties {address:"\(esc(to))"}
             end tell
-            return "{\\"id\\":\\"draft\\",\\"name\\":\\"" & subject of newMessage & "\\",\\"type\\":\\"message\\"}"
+            return "{\\"id\\":\\"draft\\",\\"name\\":\\"" & my jsonEsc(subject of newMessage) & "\\",\\"type\\":\\"message\\"}"
         end tell
         """
     }
@@ -181,7 +181,7 @@ enum MailTemplates {
         tell application id "\(bundleId)"
             set m to first message of mailboxes whose id is \(esc(messageId))
             \(setStatements.joined(separator: "\n            "))
-            return "{\\"id\\":" & (id of m) & ",\\"name\\":\\"" & (subject of m) & "\\",\\"type\\":\\"message\\"}"
+            return "{\\"id\\":" & (id of m) & ",\\"name\\":\\"" & my jsonEsc(subject of m) & "\\",\\"type\\":\\"message\\"}"
         end tell
         """
     }
@@ -195,7 +195,7 @@ enum MailTemplates {
             set m to first message of mailboxes whose id is \(esc(messageId))
             set mSubject to subject of m
             delete m
-            return "{\\"deleted\\":true,\\"name\\":\\"" & mSubject & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(mSubject) & "\\"}"
         end tell
         """
     }
