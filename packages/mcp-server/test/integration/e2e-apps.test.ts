@@ -77,6 +77,12 @@ async function callTool(name: string, args: Record<string, unknown> = {}): Promi
     params: { name, arguments: args },
   });
   const response = await promise;
+  if (response["error"]) {
+    const err = response["error"] as Record<string, unknown>;
+    const code = err["code"] != null ? ` (code: ${err["code"]})` : "";
+    const text = String(err["message"] ?? JSON.stringify(err)) + code;
+    return { raw: response, text, parsed: err, isError: true };
+  }
   const result = response["result"] as Record<string, unknown>;
   const content = result["content"] as Array<Record<string, unknown>>;
   const text = (content[0]?.["text"] as string) ?? "";
