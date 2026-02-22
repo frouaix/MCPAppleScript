@@ -44,7 +44,7 @@ enum MusicTemplates {
             set output to "["
             repeat with i from 1 to count of playlistList
                 set p to item i of playlistList
-                set output to output & "{\\"id\\":\\"" & pId of p & "\\",\\"name\\":\\"" & pName of p & "\\",\\"type\\":\\"playlist\\",\\"itemCount\\":" & (trackCount of p as text) & "}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(pId of p) & "\\",\\"name\\":\\"" & my jsonEsc(pName of p) & "\\",\\"type\\":\\"playlist\\",\\"itemCount\\":" & (trackCount of p as text) & "}"
                 if i < (count of playlistList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -81,7 +81,7 @@ enum MusicTemplates {
                     set tArtist to artist of t
                     set tAlbum to album of t
                     set tDuration to duration of t
-                    set output to output & "{\\"id\\":\\"" & tId & "\\",\\"name\\":\\"" & tName & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & tArtist & "\\",\\"album\\":\\"" & tAlbum & "\\",\\"duration\\":" & tDuration & "}}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(tId) & "\\",\\"name\\":\\"" & my jsonEsc(tName) & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & my jsonEsc(tArtist) & "\\",\\"album\\":\\"" & my jsonEsc(tAlbum) & "\\",\\"duration\\":" & tDuration & "}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -107,7 +107,7 @@ enum MusicTemplates {
             set tYear to year of t
             set tRating to rating of t
             set tPlays to played count of t
-            return "{\\"id\\":\\"" & tId & "\\",\\"name\\":\\"" & tName & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & tArtist & "\\",\\"album\\":\\"" & tAlbum & "\\",\\"duration\\":" & tDuration & ",\\"genre\\":\\"" & tGenre & "\\",\\"year\\":" & tYear & ",\\"rating\\":" & tRating & ",\\"playCount\\":" & tPlays & "}}"
+            return "{\\"id\\":\\"" & my jsonEsc(tId) & "\\",\\"name\\":\\"" & my jsonEsc(tName) & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & my jsonEsc(tArtist) & "\\",\\"album\\":\\"" & my jsonEsc(tAlbum) & "\\",\\"duration\\":" & tDuration & ",\\"genre\\":\\"" & my jsonEsc(tGenre) & "\\",\\"year\\":" & tYear & ",\\"rating\\":" & tRating & ",\\"playCount\\":" & tPlays & "}}"
         end tell
         """
     }
@@ -129,7 +129,7 @@ enum MusicTemplates {
                 set tId to id of t
                 set tName to name of t
                 set tArtist to artist of t
-                set output to output & "{\\"id\\":\\"" & tId & "\\",\\"name\\":\\"" & tName & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & tArtist & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(tId) & "\\",\\"name\\":\\"" & my jsonEsc(tName) & "\\",\\"type\\":\\"track\\",\\"properties\\":{\\"artist\\":\\"" & my jsonEsc(tArtist) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -149,7 +149,7 @@ enum MusicTemplates {
         tell application id "\(bundleId)"
             set newPlaylist to make new playlist with properties {name:"\(esc(name))", description:"\(description)"}
             set pId to id of newPlaylist
-            return "{\\"id\\":\\"" & pId & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"playlist\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(pId) & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"playlist\\"}"
         end tell
         """
     }
@@ -163,7 +163,7 @@ enum MusicTemplates {
             tell application id "\(bundleId)"
                 set t to first track of library playlist 1 whose id is "\(esc(trackId))"
                 play t
-                return "{\\"playing\\":true,\\"track\\":\\"" & (name of t) & "\\"}"
+                return "{\\"playing\\":true,\\"track\\":\\"" & my jsonEsc(name of t) & "\\"}"
             end tell
             """
         }
@@ -190,7 +190,7 @@ enum MusicTemplates {
             next track
             delay 0.5
             set t to current track
-            return "{\\"track\\":\\"" & (name of t) & "\\",\\"artist\\":\\"" & (artist of t) & "\\"}"
+            return "{\\"track\\":\\"" & my jsonEsc(name of t) & "\\",\\"artist\\":\\"" & my jsonEsc(artist of t) & "\\"}"
         end tell
         """
     }
@@ -201,7 +201,7 @@ enum MusicTemplates {
             previous track
             delay 0.5
             set t to current track
-            return "{\\"track\\":\\"" & (name of t) & "\\",\\"artist\\":\\"" & (artist of t) & "\\"}"
+            return "{\\"track\\":\\"" & my jsonEsc(name of t) & "\\",\\"artist\\":\\"" & my jsonEsc(artist of t) & "\\"}"
         end tell
         """
     }
@@ -216,7 +216,7 @@ enum MusicTemplates {
                 set tAlbum to album of t
                 set tPos to player position
                 set tDur to duration of t
-                return "{\\"playing\\":true,\\"track\\":\\"" & tName & "\\",\\"artist\\":\\"" & tArtist & "\\",\\"album\\":\\"" & tAlbum & "\\",\\"position\\":" & tPos & ",\\"duration\\":" & tDur & "}"
+                return "{\\"playing\\":true,\\"track\\":\\"" & my jsonEsc(tName) & "\\",\\"artist\\":\\"" & my jsonEsc(tArtist) & "\\",\\"album\\":\\"" & my jsonEsc(tAlbum) & "\\",\\"position\\":" & tPos & ",\\"duration\\":" & tDur & "}"
             else
                 return "{\\"playing\\":false}"
             end if

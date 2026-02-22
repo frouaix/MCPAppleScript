@@ -37,7 +37,7 @@ enum ContactsTemplates {
             set output to "["
             repeat with i from 1 to count of groupList
                 set g to item i of groupList
-                set output to output & "{\\"id\\":\\"" & groupId of g & "\\",\\"name\\":\\"" & groupName of g & "\\",\\"type\\":\\"group\\",\\"itemCount\\":" & (personCount of g as text) & "}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(groupId of g) & "\\",\\"name\\":\\"" & my jsonEsc(groupName of g) & "\\",\\"type\\":\\"group\\",\\"itemCount\\":" & (personCount of g as text) & "}"
                 if i < (count of groupList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -73,7 +73,7 @@ enum ContactsTemplates {
                     set pFirst to first name of p
                     set pLast to last name of p
                     set pName to pFirst & " " & pLast
-                    set output to output & "{\\"id\\":\\"" & pId & "\\",\\"name\\":\\"" & pName & "\\",\\"type\\":\\"person\\",\\"properties\\":{\\"firstName\\":\\"" & pFirst & "\\",\\"lastName\\":\\"" & pLast & "\\"}}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(pId) & "\\",\\"name\\":\\"" & my jsonEsc(pName) & "\\",\\"type\\":\\"person\\",\\"properties\\":{\\"firstName\\":\\"" & my jsonEsc(pFirst) & "\\",\\"lastName\\":\\"" & my jsonEsc(pLast) & "\\"}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -106,7 +106,7 @@ enum ContactsTemplates {
                 if phoneList is not "" then set phoneList to phoneList & ", "
                 set phoneList to phoneList & value of ph
             end repeat
-            return "{\\"id\\":\\"" & pId & "\\",\\"name\\":\\"" & pFirst & " " & pLast & "\\",\\"type\\":\\"person\\",\\"properties\\":{\\"firstName\\":\\"" & pFirst & "\\",\\"lastName\\":\\"" & pLast & "\\",\\"organization\\":\\"" & pOrg & "\\",\\"jobTitle\\":\\"" & pTitle & "\\",\\"note\\":\\"" & pNote & "\\",\\"emails\\":\\"" & emailList & "\\",\\"phones\\":\\"" & phoneList & "\\"}}"
+            return "{\\"id\\":\\"" & my jsonEsc(pId) & "\\",\\"name\\":\\"" & my jsonEsc(pFirst) & " " & my jsonEsc(pLast) & "\\",\\"type\\":\\"person\\",\\"properties\\":{\\"firstName\\":\\"" & my jsonEsc(pFirst) & "\\",\\"lastName\\":\\"" & my jsonEsc(pLast) & "\\",\\"organization\\":\\"" & my jsonEsc(pOrg) & "\\",\\"jobTitle\\":\\"" & my jsonEsc(pTitle) & "\\",\\"note\\":\\"" & my jsonEsc(pNote) & "\\",\\"emails\\":\\"" & my jsonEsc(emailList) & "\\",\\"phones\\":\\"" & my jsonEsc(phoneList) & "\\"}}"
         end tell
         """
     }
@@ -128,7 +128,7 @@ enum ContactsTemplates {
                 set pId to id of p
                 set pFirst to first name of p
                 set pLast to last name of p
-                set output to output & "{\\"id\\":\\"" & pId & "\\",\\"name\\":\\"" & pFirst & " " & pLast & "\\",\\"type\\":\\"person\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(pId) & "\\",\\"name\\":\\"" & my jsonEsc(pFirst) & " " & my jsonEsc(pLast) & "\\",\\"type\\":\\"person\\"}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -170,7 +170,7 @@ enum ContactsTemplates {
             \(extraLines.joined(separator: "\n            "))
             save
             set pId to id of newPerson
-            return "{\\"id\\":\\"" & pId & "\\",\\"name\\":\\"\(esc(firstName)) \(lastName)\\",\\"type\\":\\"person\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(pId) & "\\",\\"name\\":\\"\(esc(firstName)) \(lastName)\\",\\"type\\":\\"person\\"}"
         end tell
         """
     }
@@ -205,7 +205,7 @@ enum ContactsTemplates {
             set p to person id "\(esc(personId))"
             \(setStatements.joined(separator: "\n            "))
             save
-            return "{\\"id\\":\\"" & (id of p) & "\\",\\"name\\":\\"" & (first name of p) & " " & (last name of p) & "\\",\\"type\\":\\"person\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(id of p) & "\\",\\"name\\":\\"" & my jsonEsc(first name of p) & " " & my jsonEsc(last name of p) & "\\",\\"type\\":\\"person\\"}"
         end tell
         """
     }
@@ -220,7 +220,7 @@ enum ContactsTemplates {
             set pName to first name of p & " " & last name of p
             delete p
             save
-            return "{\\"deleted\\":true,\\"name\\":\\"" & pName & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(pName) & "\\"}"
         end tell
         """
     }

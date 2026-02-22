@@ -44,7 +44,7 @@ enum SafariTemplates {
             set output to "["
             repeat with i from 1 to count of windowList
                 set w to item i of windowList
-                set output to output & "{\\"id\\":" & (windowId of w) & ",\\"name\\":\\"" & windowName of w & "\\",\\"type\\":\\"window\\",\\"itemCount\\":" & (tabCount of w as text) & "}"
+                set output to output & "{\\"id\\":" & (windowId of w) & ",\\"name\\":\\"" & my jsonEsc(windowName of w) & "\\",\\"type\\":\\"window\\",\\"itemCount\\":" & (tabCount of w as text) & "}"
                 if i < (count of windowList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -72,7 +72,7 @@ enum SafariTemplates {
                 set t to item i of allTabs
                 set tName to name of t
                 set tUrl to URL of t
-                set output to output & "{\\"id\\":" & i & ",\\"name\\":\\"" & tName & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & tUrl & "\\"}}"
+                set output to output & "{\\"id\\":" & i & ",\\"name\\":\\"" & my jsonEsc(tName) & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & my jsonEsc(tUrl) & "\\"}}"
                 if i < totalCount then set output to output & ","
             end repeat
             set output to output & "]}"
@@ -98,7 +98,7 @@ enum SafariTemplates {
             set tName to name of t
             set tUrl to URL of t
             set tSource to source of t
-            return "{\\"id\\":\(tabIndex),\\"name\\":\\"" & tName & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & tUrl & "\\",\\"source\\":\\"" & tSource & "\\"}}"
+            return "{\\"id\\":\(tabIndex),\\"name\\":\\"" & my jsonEsc(tName) & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & my jsonEsc(tUrl) & "\\",\\"source\\":\\"" & my jsonEsc(tSource) & "\\"}}"
         end tell
         """
     }
@@ -124,7 +124,7 @@ enum SafariTemplates {
             set output to "["
             repeat with i from 1 to count of matchingTabs
                 set t to item i of matchingTabs
-                set output to output & "{\\"id\\":" & i & ",\\"name\\":\\"" & tName of t & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & tUrl of t & "\\",\\"windowId\\":" & (tWindow of t) & "}}"
+                set output to output & "{\\"id\\":" & i & ",\\"name\\":\\"" & my jsonEsc(tName of t) & "\\",\\"type\\":\\"tab\\",\\"properties\\":{\\"url\\":\\"" & my jsonEsc(tUrl of t) & "\\",\\"windowId\\":" & (tWindow of t) & "}}"
                 if i < (count of matchingTabs) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -178,7 +178,7 @@ enum SafariTemplates {
             set t to tab \(tabIndex) of \(windowClause)
             set tName to name of t
             close t
-            return "{\\"closed\\":true,\\"name\\":\\"" & tName & "\\"}"
+            return "{\\"closed\\":true,\\"name\\":\\"" & my jsonEsc(tName) & "\\"}"
         end tell
         """
     }
@@ -211,7 +211,7 @@ enum SafariTemplates {
         return """
         tell application id "\(bundleId)"
             set result to do JavaScript "\(esc(script))" in tab \(tabIndex) of \(windowClause)
-            return "{\\"result\\":\\"" & result & "\\"}"
+            return "{\\"result\\":\\"" & my jsonEsc(result) & "\\"}"
         end tell
         """
     }

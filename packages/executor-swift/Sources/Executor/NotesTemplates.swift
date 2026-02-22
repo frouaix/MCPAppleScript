@@ -37,7 +37,7 @@ enum NotesTemplates {
             set output to "["
             repeat with i from 1 to count of folderList
                 set f to item i of folderList
-                set output to output & "{\\"id\\":\\"" & id of f & "\\",\\"name\\":\\"" & name of f & "\\",\\"type\\":\\"folder\\",\\"itemCount\\":" & (itemCount of f as text) & "}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(id of f) & "\\",\\"name\\":\\"" & my jsonEsc(name of f) & "\\",\\"type\\":\\"folder\\",\\"itemCount\\":" & (itemCount of f as text) & "}"
                 if i < (count of folderList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -72,7 +72,7 @@ enum NotesTemplates {
                     set nId to id of n
                     set nName to name of n
                     set nDate to modification date of n as «class isot» as string
-                    set output to output & "{\\"id\\":\\"" & nId & "\\",\\"name\\":\\"" & nName & "\\",\\"type\\":\\"note\\",\\"modifiedAt\\":\\"" & nDate & "\\"}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(nId) & "\\",\\"name\\":\\"" & my jsonEsc(nName) & "\\",\\"type\\":\\"note\\",\\"modifiedAt\\":\\"" & my jsonEsc(nDate) & "\\"}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -95,7 +95,7 @@ enum NotesTemplates {
             set nCreated to creation date of n as «class isot» as string
             set nModified to modification date of n as «class isot» as string
             set cName to name of container of n
-            return "{\\"id\\":\\"" & nId & "\\",\\"name\\":\\"" & nName & "\\",\\"type\\":\\"note\\",\\"containerName\\":\\"" & cName & "\\",\\"createdAt\\":\\"" & nCreated & "\\",\\"modifiedAt\\":\\"" & nModified & "\\",\\"properties\\":{\\"body\\":\\"" & nBody & "\\"}}"
+            return "{\\"id\\":\\"" & my jsonEsc(nId) & "\\",\\"name\\":\\"" & my jsonEsc(nName) & "\\",\\"type\\":\\"note\\",\\"containerName\\":\\"" & my jsonEsc(cName) & "\\",\\"createdAt\\":\\"" & my jsonEsc(nCreated) & "\\",\\"modifiedAt\\":\\"" & my jsonEsc(nModified) & "\\",\\"properties\\":{\\"body\\":\\"" & my jsonEsc(nBody) & "\\"}}"
         end tell
         """
     }
@@ -117,7 +117,7 @@ enum NotesTemplates {
                 set nId to id of n
                 set nName to name of n
                 set nDate to modification date of n as «class isot» as string
-                set output to output & "{\\"id\\":\\"" & nId & "\\",\\"name\\":\\"" & nName & "\\",\\"type\\":\\"note\\",\\"modifiedAt\\":\\"" & nDate & "\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(nId) & "\\",\\"name\\":\\"" & my jsonEsc(nName) & "\\",\\"type\\":\\"note\\",\\"modifiedAt\\":\\"" & my jsonEsc(nDate) & "\\"}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -145,7 +145,7 @@ enum NotesTemplates {
             set newNote to make new note \(targetClause) with properties {name:"\(title)", body:"\(body)"}
             set nId to id of newNote
             set nName to name of newNote
-            return "{\\"id\\":\\"" & nId & "\\",\\"name\\":\\"" & nName & "\\",\\"type\\":\\"note\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(nId) & "\\",\\"name\\":\\"" & my jsonEsc(nName) & "\\",\\"type\\":\\"note\\"}"
         end tell
         """
     }
@@ -170,7 +170,7 @@ enum NotesTemplates {
         tell application id "\(bundleId)"
             set n to note id "\(esc(noteId))"
             \(setStatements.joined(separator: "\n            "))
-            return "{\\"id\\":\\"" & (id of n) & "\\",\\"name\\":\\"" & (name of n) & "\\",\\"type\\":\\"note\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(id of n) & "\\",\\"name\\":\\"" & my jsonEsc(name of n) & "\\",\\"type\\":\\"note\\"}"
         end tell
         """
     }
@@ -184,7 +184,7 @@ enum NotesTemplates {
             set n to note id "\(esc(noteId))"
             set nName to name of n
             delete n
-            return "{\\"deleted\\":true,\\"name\\":\\"" & nName & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(nName) & "\\"}"
         end tell
         """
     }

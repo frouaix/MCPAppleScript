@@ -39,7 +39,7 @@ enum RemindersTemplates {
             set output to "["
             repeat with i from 1 to count of listList
                 set l to item i of listList
-                set output to output & "{\\"id\\":\\"" & listId of l & "\\",\\"name\\":\\"" & listName of l & "\\",\\"type\\":\\"list\\",\\"itemCount\\":" & (listCount of l as text) & "}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(listId of l) & "\\",\\"name\\":\\"" & my jsonEsc(listName of l) & "\\",\\"type\\":\\"list\\",\\"itemCount\\":" & (listCount of l as text) & "}"
                 if i < (count of listList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -78,7 +78,7 @@ enum RemindersTemplates {
                     try
                         set rDueDate to due date of r as «class isot» as string
                     end try
-                    set output to output & "{\\"id\\":\\"" & rId & "\\",\\"name\\":\\"" & rName & "\\",\\"type\\":\\"reminder\\",\\"properties\\":{\\"completed\\":" & rCompleted & ",\\"dueDate\\":\\"" & rDueDate & "\\"}}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(rId) & "\\",\\"name\\":\\"" & my jsonEsc(rName) & "\\",\\"type\\":\\"reminder\\",\\"properties\\":{\\"completed\\":" & rCompleted & ",\\"dueDate\\":\\"" & my jsonEsc(rDueDate) & "\\"}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -108,7 +108,7 @@ enum RemindersTemplates {
             try
                 set rDueDate to due date of r as «class isot» as string
             end try
-            return "{\\"id\\":\\"" & rId & "\\",\\"name\\":\\"" & rName & "\\",\\"type\\":\\"reminder\\",\\"containerName\\":\\"" & cName & "\\",\\"createdAt\\":\\"" & rCreated & "\\",\\"modifiedAt\\":\\"" & rModified & "\\",\\"properties\\":{\\"body\\":\\"" & rBody & "\\",\\"completed\\":" & rCompleted & ",\\"priority\\":" & rPriority & ",\\"flagged\\":" & rFlagged & ",\\"dueDate\\":\\"" & rDueDate & "\\"}}"
+            return "{\\"id\\":\\"" & my jsonEsc(rId) & "\\",\\"name\\":\\"" & my jsonEsc(rName) & "\\",\\"type\\":\\"reminder\\",\\"containerName\\":\\"" & my jsonEsc(cName) & "\\",\\"createdAt\\":\\"" & my jsonEsc(rCreated) & "\\",\\"modifiedAt\\":\\"" & my jsonEsc(rModified) & "\\",\\"properties\\":{\\"body\\":\\"" & my jsonEsc(rBody) & "\\",\\"completed\\":" & rCompleted & ",\\"priority\\":" & rPriority & ",\\"flagged\\":" & rFlagged & ",\\"dueDate\\":\\"" & my jsonEsc(rDueDate) & "\\"}}"
         end tell
         """
     }
@@ -130,7 +130,7 @@ enum RemindersTemplates {
                 set rId to id of r
                 set rName to name of r
                 set rCompleted to completed of r
-                set output to output & "{\\"id\\":\\"" & rId & "\\",\\"name\\":\\"" & rName & "\\",\\"type\\":\\"reminder\\",\\"properties\\":{\\"completed\\":" & rCompleted & "}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(rId) & "\\",\\"name\\":\\"" & my jsonEsc(rName) & "\\",\\"type\\":\\"reminder\\",\\"properties\\":{\\"completed\\":" & rCompleted & "}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -172,7 +172,7 @@ enum RemindersTemplates {
         tell application id "\(bundleId)"
             set newReminder to make new reminder \(targetClause) with properties {\(props)}\(dueDateLine)
             set rId to id of newReminder
-            return "{\\"id\\":\\"" & rId & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"reminder\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(rId) & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"reminder\\"}"
         end tell
         """
     }
@@ -209,7 +209,7 @@ enum RemindersTemplates {
         tell application id "\(bundleId)"
             set r to reminder id "\(esc(reminderId))"
             \(setStatements.joined(separator: "\n            "))
-            return "{\\"id\\":\\"" & (id of r) & "\\",\\"name\\":\\"" & (name of r) & "\\",\\"type\\":\\"reminder\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(id of r) & "\\",\\"name\\":\\"" & my jsonEsc(name of r) & "\\",\\"type\\":\\"reminder\\"}"
         end tell
         """
     }
@@ -223,7 +223,7 @@ enum RemindersTemplates {
             set r to reminder id "\(esc(reminderId))"
             set rName to name of r
             delete r
-            return "{\\"deleted\\":true,\\"name\\":\\"" & rName & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(rName) & "\\"}"
         end tell
         """
     }
@@ -245,7 +245,7 @@ enum RemindersTemplates {
         tell application id "\(bundleId)"
             set r to reminder id "\(esc(reminderId))"
             set completed of r to true
-            return "{\\"id\\":\\"" & (id of r) & "\\",\\"completed\\":true}"
+            return "{\\"id\\":\\"" & my jsonEsc(id of r) & "\\",\\"completed\\":true}"
         end tell
         """
     }

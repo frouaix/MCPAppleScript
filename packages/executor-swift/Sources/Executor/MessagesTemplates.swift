@@ -40,7 +40,7 @@ enum MessagesTemplates {
             set output to "["
             repeat with i from 1 to count of chatList
                 set c to item i of chatList
-                set output to output & "{\\"id\\":\\"" & chatId of c & "\\",\\"name\\":\\"" & chatName of c & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & chatParticipants of c & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(chatId of c) & "\\",\\"name\\":\\"" & my jsonEsc(chatName of c) & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & my jsonEsc(chatParticipants of c) & "\\"}}"
                 if i < (count of chatList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -75,7 +75,7 @@ enum MessagesTemplates {
                     set mSender to name of sender of m
                 end try
                 set mDate to date of m as «class isot» as string
-                set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"message\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & mSender & "\\",\\"date\\":\\"" & mDate & "\\"}}"
+                set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"message\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & my jsonEsc(mSender) & "\\",\\"date\\":\\"" & my jsonEsc(mDate) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]}"
@@ -99,7 +99,7 @@ enum MessagesTemplates {
                 set participantNames to participantNames & name of p
             end repeat
             set msgCount to count of messages of c
-            return "{\\"id\\":\\"" & cId & "\\",\\"name\\":\\"" & cName & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & participantNames & "\\",\\"messageCount\\":" & (msgCount as text) & "}}"
+            return "{\\"id\\":\\"" & my jsonEsc(cId) & "\\",\\"name\\":\\"" & my jsonEsc(cName) & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & my jsonEsc(participantNames) & "\\",\\"messageCount\\":" & (msgCount as text) & "}}"
         end tell
         """
     }
@@ -120,7 +120,7 @@ enum MessagesTemplates {
                 set c to item i of matchingChats
                 set cId to id of c
                 set cName to name of c
-                set output to output & "{\\"id\\":\\"" & cId & "\\",\\"name\\":\\"" & cName & "\\",\\"type\\":\\"chat\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(cId) & "\\",\\"name\\":\\"" & my jsonEsc(cName) & "\\",\\"type\\":\\"chat\\"}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"

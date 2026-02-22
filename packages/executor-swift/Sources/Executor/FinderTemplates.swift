@@ -43,7 +43,7 @@ enum FinderTemplates {
             set output to "["
             repeat with i from 1 to count of folderList
                 set f to item i of folderList
-                set output to output & "{\\"id\\":\\"" & fPath of f & "\\",\\"name\\":\\"" & fName of f & "\\",\\"type\\":\\"folder\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(fPath of f) & "\\",\\"name\\":\\"" & my jsonEsc(fName of f) & "\\",\\"type\\":\\"folder\\"}"
                 if i < (count of folderList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -74,7 +74,7 @@ enum FinderTemplates {
                     set fKind to kind of f
                     set fSize to size of f
                     set fDate to modification date of f as «class isot» as string
-                    set output to output & "{\\"id\\":\\"" & fPath & "\\",\\"name\\":\\"" & fName & "\\",\\"type\\":\\"file\\",\\"modifiedAt\\":\\"" & fDate & "\\",\\"properties\\":{\\"kind\\":\\"" & fKind & "\\",\\"size\\":" & fSize & "}}"
+                    set output to output & "{\\"id\\":\\"" & my jsonEsc(fPath) & "\\",\\"name\\":\\"" & my jsonEsc(fName) & "\\",\\"type\\":\\"file\\",\\"modifiedAt\\":\\"" & my jsonEsc(fDate) & "\\",\\"properties\\":{\\"kind\\":\\"" & my jsonEsc(fKind) & "\\",\\"size\\":" & fSize & "}}"
                     if i < endIdx then set output to output & ","
                 end repeat
             end if
@@ -97,7 +97,7 @@ enum FinderTemplates {
             set fSize to size of fi
             set fCreated to creation date of fi as «class isot» as string
             set fModified to modification date of fi as «class isot» as string
-            return "{\\"id\\":\\"" & POSIX path of f & "\\",\\"name\\":\\"" & fName & "\\",\\"type\\":\\"file\\",\\"createdAt\\":\\"" & fCreated & "\\",\\"modifiedAt\\":\\"" & fModified & "\\",\\"properties\\":{\\"kind\\":\\"" & fKind & "\\",\\"size\\":" & fSize & "}}"
+            return "{\\"id\\":\\"" & my jsonEsc(POSIX path of f) & "\\",\\"name\\":\\"" & my jsonEsc(fName) & "\\",\\"type\\":\\"file\\",\\"createdAt\\":\\"" & my jsonEsc(fCreated) & "\\",\\"modifiedAt\\":\\"" & my jsonEsc(fModified) & "\\",\\"properties\\":{\\"kind\\":\\"" & my jsonEsc(fKind) & "\\",\\"size\\":" & fSize & "}}"
         end tell
         """
     }
@@ -120,7 +120,7 @@ enum FinderTemplates {
                 set f to item i of matchingItems
                 set fName to name of f
                 set fPath to POSIX path of (f as alias)
-                set output to output & "{\\"id\\":\\"" & fPath & "\\",\\"name\\":\\"" & fName & "\\",\\"type\\":\\"file\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(fPath) & "\\",\\"name\\":\\"" & my jsonEsc(fName) & "\\",\\"type\\":\\"file\\"}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -141,7 +141,7 @@ enum FinderTemplates {
             set parentFolder to POSIX file "\(esc(parentPath))" as alias
             set newFolder to make new folder at folder parentFolder with properties {name:"\(esc(name))"}
             set fPath to POSIX path of (newFolder as alias)
-            return "{\\"id\\":\\"" & fPath & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"folder\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(fPath) & "\\",\\"name\\":\\"\(esc(name))\\",\\"type\\":\\"folder\\"}"
         end tell
         """
     }
@@ -181,7 +181,7 @@ enum FinderTemplates {
             set sourceItem to POSIX file "\(esc(sourcePath))" as alias
             set dupItem to duplicate sourceItem\(destClause)
             set dupPath to POSIX path of (dupItem as alias)
-            return "{\\"duplicated\\":true,\\"path\\":\\"" & dupPath & "\\"}"
+            return "{\\"duplicated\\":true,\\"path\\":\\"" & my jsonEsc(dupPath) & "\\"}"
         end tell
         """
     }
@@ -195,7 +195,7 @@ enum FinderTemplates {
             set targetItem to POSIX file "\(esc(path))" as alias
             set itemName to name of targetItem
             delete targetItem
-            return "{\\"deleted\\":true,\\"name\\":\\"" & itemName & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(itemName) & "\\"}"
         end tell
         """
     }

@@ -37,7 +37,7 @@ enum CalendarTemplates {
             set output to "["
             repeat with i from 1 to count of calList
                 set c to item i of calList
-                set output to output & "{\\"id\\":\\"" & calId of c & "\\",\\"name\\":\\"" & calName of c & "\\",\\"type\\":\\"calendar\\"}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(calId of c) & "\\",\\"name\\":\\"" & my jsonEsc(calName of c) & "\\",\\"type\\":\\"calendar\\"}"
                 if i < (count of calList) then set output to output & ","
             end repeat
             set output to output & "]"
@@ -70,7 +70,7 @@ enum CalendarTemplates {
                 set eSummary to summary of e
                 set eStart to start date of e as «class isot» as string
                 set eEnd to end date of e as «class isot» as string
-                set output to output & "{\\"id\\":\\"" & eId & "\\",\\"name\\":\\"" & eSummary & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & eStart & "\\",\\"endDate\\":\\"" & eEnd & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(eId) & "\\",\\"name\\":\\"" & my jsonEsc(eSummary) & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & my jsonEsc(eStart) & "\\",\\"endDate\\":\\"" & my jsonEsc(eEnd) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]}"
@@ -101,7 +101,7 @@ enum CalendarTemplates {
             set eLoc to location of e
             set eDesc to description of e
             set eAllDay to allday event of e
-            return "{\\"id\\":\\"" & eId & "\\",\\"name\\":\\"" & eSummary & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & eStart & "\\",\\"endDate\\":\\"" & eEnd & "\\",\\"location\\":\\"" & eLoc & "\\",\\"description\\":\\"" & eDesc & "\\",\\"allDay\\":" & eAllDay & "}}"
+            return "{\\"id\\":\\"" & my jsonEsc(eId) & "\\",\\"name\\":\\"" & my jsonEsc(eSummary) & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & my jsonEsc(eStart) & "\\",\\"endDate\\":\\"" & my jsonEsc(eEnd) & "\\",\\"location\\":\\"" & my jsonEsc(eLoc) & "\\",\\"description\\":\\"" & my jsonEsc(eDesc) & "\\",\\"allDay\\":" & eAllDay & "}}"
         end tell
         """
     }
@@ -128,7 +128,7 @@ enum CalendarTemplates {
                 set eId to uid of e
                 set eSummary to summary of e
                 set eStart to start date of e as «class isot» as string
-                set output to output & "{\\"id\\":\\"" & eId & "\\",\\"name\\":\\"" & eSummary & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & eStart & "\\"}}"
+                set output to output & "{\\"id\\":\\"" & my jsonEsc(eId) & "\\",\\"name\\":\\"" & my jsonEsc(eSummary) & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & my jsonEsc(eStart) & "\\"}}"
                 if i < resultCount then set output to output & ","
             end repeat
             set output to output & "]"
@@ -161,7 +161,7 @@ enum CalendarTemplates {
             set endDate to date "\(esc(endDate))"
             set newEvent to make new event at end of events of targetCalendar with properties {summary:"\(esc(title))", start date:startDate, end date:endDate, location:"\(location)", description:"\(notes)", allday event:\(allDay)}
             set eId to uid of newEvent
-            return "{\\"id\\":\\"" & eId & "\\",\\"name\\":\\"\(esc(title))\\",\\"type\\":\\"event\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(eId) & "\\",\\"name\\":\\"\(esc(title))\\",\\"type\\":\\"event\\"}"
         end tell
         """
     }
@@ -203,7 +203,7 @@ enum CalendarTemplates {
             if (count of flatEvents) is 0 then error "Event not found: \(esc(eventId))"
             set e to item 1 of flatEvents
             \(setStatements.joined(separator: "\n            "))
-            return "{\\"id\\":\\"" & (uid of e) & "\\",\\"name\\":\\"" & (summary of e) & "\\",\\"type\\":\\"event\\"}"
+            return "{\\"id\\":\\"" & my jsonEsc(uid of e) & "\\",\\"name\\":\\"" & my jsonEsc(summary of e) & "\\",\\"type\\":\\"event\\"}"
         end tell
         """
     }
@@ -225,7 +225,7 @@ enum CalendarTemplates {
             set e to item 1 of flatEvents
             set eName to summary of e
             delete e
-            return "{\\"deleted\\":true,\\"name\\":\\"" & eName & "\\"}"
+            return "{\\"deleted\\":true,\\"name\\":\\"" & my jsonEsc(eName) & "\\"}"
         end tell
         """
     }
