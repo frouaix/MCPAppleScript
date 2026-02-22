@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import { createServer, ServerDeps } from "../../src/server.js";
 import { ConfigSchema } from "../../src/config/schema.js";

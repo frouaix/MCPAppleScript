@@ -42,7 +42,7 @@ export class SafariAdapter implements ResourceAdapter {
     return {
       templateId: "safari.get_tab",
       parameters: {
-        tabIndex: parseInt(parts[0], 10) || 1,
+        tabIndex: parseInt(parts[0] ?? "1", 10) || 1,
         windowId: parts[1] ? parseInt(parts[1], 10) : 0,
       },
     };
@@ -77,7 +77,7 @@ export class SafariAdapter implements ResourceAdapter {
     return {
       templateId: "safari.close_tab",
       parameters: {
-        tabIndex: parseInt(parts[0], 10) || 1,
+        tabIndex: parseInt(parts[0] ?? "1", 10) || 1,
         windowId: parts[1] ? parseInt(parts[1], 10) : 0,
       },
     };
