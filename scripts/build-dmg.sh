@@ -56,20 +56,20 @@ Installation:
   1. Copy "mcp-applescript" to /usr/local/bin/ (or another directory in your PATH):
        sudo cp mcp-applescript /usr/local/bin/
 
-  2. Create a config file at ~/.config/mcp-applescript/config.json:
-       mkdir -p ~/.config/mcp-applescript
-       cat > ~/.config/mcp-applescript/config.json << 'EOF'
+  2. Create a config file at ~/.config/applescript-mcp/config.json:
+       mkdir -p ~/.config/applescript-mcp
+       cat > ~/.config/applescript-mcp/config.json << 'EOF'
        {
          "defaultMode": "readonly",
          "apps": {
-           "com.apple.Notes": { "enabled": true, "allowedTools": ["notes.create_note"] },
-           "com.apple.Calendar": { "enabled": true, "allowedTools": ["calendar.create_event"] },
-           "com.apple.Mail": { "enabled": true, "allowedTools": ["mail.compose_draft"] }
+           "com.apple.Notes": { "enabled": true },
+           "com.apple.Calendar": { "enabled": true },
+           "com.apple.Mail": { "enabled": true }
          }
        }
        EOF
 
-  3. Add to your MCP client config (e.g., Claude Desktop):
+  3. Add to your MCP client config (e.g., Claude Desktop, VS Code, or another MCP client):
        {
          "mcpServers": {
            "applescript": {
