@@ -149,28 +149,63 @@ describe("E2E app tests", () => {
   describe("readonly operations", () => {
     for (const app of ALL_APPS) {
       describe(app, () => {
+        let hadSuccess = false;
+
+        after(() => {
+          // Ensure that at least one readonly operation succeeded for this app.
+          assert.ok(
+            hadSuccess,
+            `Expected at least one successful readonly operation for app ${app}`,
+          );
+        });
+
         it(`${app}: list_containers`, async () => {
           const { parsed, isError } = await callTool("app.list_containers", { app });
           // Some apps may error if not running or no permission — that's useful signal too
           if (!isError) {
-            assert.ok(Array.isArray(parsed) || typeof parsed === "object",
-              `Expected array or object, got ${typeof parsed}`);
+            assert.ok(
+              Array.isArray(parsed) || typeof parsed === "object",
+              `Expected array or object, got ${typeof parsed}`,
+            );
+            hadSuccess = true;
+          } else {
+            // Validate error shape so error paths are also covered.
+            assert.ok(
+              parsed !== null && typeof parsed === "object",
+              `Expected structured error object, got ${typeof parsed}`,
+            );
           }
         });
 
         it(`${app}: list (limit 3)`, async () => {
           const { parsed, isError } = await callTool("app.list", { app, limit: 3 });
           if (!isError) {
-            assert.ok(Array.isArray(parsed) || typeof parsed === "object",
-              `Expected array or object, got ${typeof parsed}`);
+            assert.ok(
+              Array.isArray(parsed) || typeof parsed === "object",
+              `Expected array or object, got ${typeof parsed}`,
+            );
+            hadSuccess = true;
+          } else {
+            assert.ok(
+              parsed !== null && typeof parsed === "object",
+              `Expected structured error object, got ${typeof parsed}`,
+            );
           }
         });
 
         it(`${app}: search`, async () => {
           const { parsed, isError } = await callTool("app.search", { app, query: "test", limit: 3 });
           if (!isError) {
-            assert.ok(Array.isArray(parsed) || typeof parsed === "object",
-              `Expected array or object, got ${typeof parsed}`);
+            assert.ok(
+              Array.isArray(parsed) || typeof parsed === "object",
+              `Expected array or object, got ${typeof parsed}`,
+            );
+            hadSuccess = true;
+          } else {
+            assert.ok(
+              parsed !== null && typeof parsed === "object",
+              `Expected structured error object, got ${typeof parsed}`,
+            );
           }
         });
       });
