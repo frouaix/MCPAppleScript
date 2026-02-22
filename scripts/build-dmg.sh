@@ -69,7 +69,7 @@ Installation:
        }
        EOF
 
-  3. Add to your MCP client config (e.g., VS Code / Copilot):
+  3. Add to your MCP client config (e.g., Claude Desktop, VS Code, or another MCP client):
        {
          "mcpServers": {
            "applescript": {
