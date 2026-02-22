@@ -121,13 +121,16 @@ describe("MCP server integration", () => {
     const tools = result["tools"] as Array<Record<string, unknown>>;
     const toolNames = tools.map((t) => t["name"]);
 
-    // Default mode is readonly — only 4 tools visible
-    assert.equal(tools.length, 4, `Expected 4 tools in readonly mode, got ${tools.length}: ${toolNames.join(", ")}`);
+    // Default mode is readonly — only 7 tools visible
+    assert.equal(tools.length, 7, `Expected 7 tools in readonly mode, got ${tools.length}: ${toolNames.join(", ")}`);
     assert.ok(toolNames.includes("applescript.ping"));
-    assert.ok(toolNames.includes("applescript.list_apps"));
     assert.ok(toolNames.includes("applescript.get_mode"));
     assert.ok(toolNames.includes("applescript.set_mode"));
-    assert.ok(!toolNames.includes("notes.create_note"), "notes.create_note should not be visible in readonly");
+    assert.ok(toolNames.includes("app.list_containers"));
+    assert.ok(toolNames.includes("app.list"));
+    assert.ok(toolNames.includes("app.get"));
+    assert.ok(toolNames.includes("app.search"));
+    assert.ok(!toolNames.includes("app.create"), "app.create should not be visible in readonly");
   });
 
   it("should handle ping tool call", async () => {
@@ -149,7 +152,7 @@ describe("MCP server integration", () => {
     const text = content[0]!["text"] as string;
     const parsed = JSON.parse(text);
     assert.equal(parsed.ok, true);
-    assert.equal(parsed.version, "0.1.0");
+    assert.equal(parsed.version, "0.2.0");
   });
 
   it("should show all tools after switching to create mode", async () => {
@@ -188,9 +191,9 @@ describe("MCP server integration", () => {
     const toolNames = tools.map((t) => t["name"]);
 
     // Should now include create-level tools
-    assert.ok(toolNames.includes("notes.create_note"), "notes.create_note should be visible in create mode");
-    assert.ok(toolNames.includes("calendar.create_event"), "calendar.create_event should be visible in create mode");
-    assert.ok(toolNames.includes("mail.compose_draft"), "mail.compose_draft should be visible in create mode");
+    assert.ok(toolNames.includes("app.create"), "app.create should be visible in create mode");
+    assert.ok(toolNames.includes("app.action"), "app.action should be visible in create mode");
+    assert.ok(toolNames.includes("applescript.run_template"), "applescript.run_template should be visible in create mode");
     // But not full-mode tools
     assert.ok(!toolNames.includes("applescript.run_script"), "run_script should not be visible in create mode");
   });
