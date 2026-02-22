@@ -2,6 +2,19 @@
 
 A local MCP server that exposes controlled AppleScript automation tools to MCP clients on macOS.
 
+> [!CAUTION]
+> **This software can read, create, modify, and delete your personal data** across Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, and Safari.
+>
+> By running this server you are granting an AI model the ability to interact with your macOS applications on your behalf. Although multiple safety layers exist (operation modes, per-app allowlists, destructive-action confirmation), **no automated safeguard is foolproof**. An unexpected prompt, a misconfigured policy, or a model hallucination could result in **data loss, disclosure of private information, or unintended actions** such as sending messages or emails.
+>
+> **You are solely responsible for:**
+> - Reviewing and understanding the [configuration](#configuration) and [policy model](#policy-model) before enabling any app
+> - Starting in `readonly` mode and only escalating when you understand the consequences
+> - Keeping the number of enabled apps to the minimum you actually need
+> - Never running in `full` mode unattended
+>
+> This project is provided **as-is, with no warranty**. See [LICENSE](LICENSE).
+
 ## Overview
 
 MCP-AppleScript provides a secure bridge between the [Model Context Protocol](https://modelcontextprotocol.io/) and macOS automation via AppleScript. It consists of two components:

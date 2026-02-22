@@ -52,6 +52,19 @@ cat > "$STAGING/INSTALL.txt" <<'INSTALL_EOF'
 MCP-AppleScript Bridge Server
 ==============================
 
+  ⚠️  WARNING — READ BEFORE USE  ⚠️
+
+  This software can read, create, modify, and delete your personal data
+  across Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos,
+  Music, Finder, and Safari.
+
+  By running this server you grant an AI model the ability to interact
+  with your macOS applications. No automated safeguard is foolproof.
+  Start in readonly mode, enable only the apps you need, and never run
+  in full mode unattended.
+
+  Provided as-is with no warranty. See LICENSE.
+
 Installation:
   1. Copy "mcp-applescript" to /usr/local/bin/ (or another directory in your PATH):
        sudo cp mcp-applescript /usr/local/bin/
