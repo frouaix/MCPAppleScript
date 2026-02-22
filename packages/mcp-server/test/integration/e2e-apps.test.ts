@@ -109,8 +109,16 @@ const ALL_APPS = [
 ];
 
 // ─── Test suite ───────────────────────────────────────────────────────────────
+// These tests require macOS with Automation permissions and real apps running.
+// Gate behind APPLESCRIPT_E2E=1 and skip automatically in CI.
 
-describe("E2E app tests", () => {
+const skipReason: string | undefined = process.env.CI
+  ? "Skipped in CI environment (set APPLESCRIPT_E2E=1 and unset CI to run)"
+  : !process.env.APPLESCRIPT_E2E
+    ? "Set APPLESCRIPT_E2E=1 to run E2E tests locally"
+    : undefined;
+
+describe("E2E app tests", { skip: skipReason }, () => {
   before(async () => {
     const env = { ...process.env };
     delete env["APPLESCRIPT_MCP_CONFIG"];
