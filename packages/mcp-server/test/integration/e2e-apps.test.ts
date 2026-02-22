@@ -43,6 +43,7 @@ function readResponseById(proc: ChildProcess, id: number, timeoutMs = 15000): Pr
           const msg = JSON.parse(line) as Record<string, unknown>;
           if (msg["id"] === id) {
             proc.stdout!.off("data", handler);
+            clearTimeout(timer);
             resolve(msg);
             return;
           }
@@ -52,7 +53,11 @@ function readResponseById(proc: ChildProcess, id: number, timeoutMs = 15000): Pr
       }
     };
     proc.stdout!.on("data", handler);
-    setTimeout(() => reject(new Error(`Timeout waiting for response id=${id}`)), timeoutMs);
+    const timer = setTimeout(() => {
+      proc.stdout!.off("data", handler);
+      reject(new Error(`Timeout waiting for response id=${id}`));
+    }, timeoutMs);
+    timer.unref();
   });
 }
 
