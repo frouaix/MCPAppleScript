@@ -116,7 +116,9 @@ export async function runExecutor(
       });
     });
 
-    // Write request JSON to stdin and close
+    // Write request JSON to stdin and close.
+    // Ignore EPIPE — the child may exit before reading all input.
+    child.stdin.on("error", () => {});
     const requestJson = JSON.stringify(request);
     child.stdin.write(requestJson);
     child.stdin.end();
