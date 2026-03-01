@@ -9,7 +9,7 @@ import { createServer } from "./server.js";
 function parseArgs() {
   const args = process.argv.slice(2);
   let http = false;
-  let port = 3000;
+  let port = 3333;
   let host = "127.0.0.1";
 
   for (let i = 0; i < args.length; i++) {
