@@ -10,15 +10,14 @@ build/
 *.d.ts
 !*.config.js
 
-# Swift build
+# Swift build (legacy)
 .build/
 .swiftpm/
 *.xcodeproj
 *.xcworkspace
 
 # Executables
-packages/executor-swift/.build/
-applescript-executor
+dist/bin/
 
 # Testing
 coverage/

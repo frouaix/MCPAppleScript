@@ -4,41 +4,39 @@
 
 ```bash
 pnpm install                    # Install all dependencies
-pnpm build                      # Build TypeScript + Swift
+pnpm build                      # Build TypeScript
 pnpm test:unit                  # ~150 TypeScript unit tests
-pnpm test:integration           # 4 integration tests (requires macOS + TCC permissions)
+pnpm test:integration           # Integration tests (requires macOS + TCC permissions)
 pnpm lint                       # ESLint
 pnpm format                     # Prettier
 
 # Single test file
 cd packages/mcp-server && npx tsx --test test/unit/policy.test.ts
 
-# Swift executor
-cd packages/executor-swift && swift build
-cd packages/executor-swift && swift test
-
 # Standalone binary
-pnpm build:sea                  # Node.js SEA + embedded Swift executor
+pnpm build:sea                  # Node.js SEA binary
 pnpm build:dmg                  # Package as .dmg
 ```
 
 ## Architecture
 
-Two-process architecture connected via JSON over stdin/stdout:
+Single-process TypeScript architecture using `osascript` for AppleScript execution:
 
 ```
-MCP Client → TypeScript MCP Server → Swift Executor → macOS Apps (via Apple Events)
-               (protocol, policy,      (NSAppleScript,
-                adapters, config)        templates)
+MCP Client → TypeScript MCP Server → osascript → macOS Apps (via Apple Events)
+               (protocol, policy,     (CLI tool)
+                adapters, templates)
 ```
 
-**Data flow for a tool call**: MCP request → Zod validation → policy check → mode gate → `ResourceAdapter` maps to `{templateId, parameters}` → executor spawned → Swift builds AppleScript from template → executes via `NSAppleScript` → JSON result returned.
+**Transports**: stdio (default) or Streamable HTTP (`--http` flag).
+
+**Data flow for a tool call**: MCP request → Zod validation → policy check → mode gate → `ResourceAdapter` maps to `{templateId, parameters}` → TypeScript template builder generates AppleScript → executed via `osascript` → JSON result returned.
 
 ### ResourceAdapter Pattern
 
-The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`) and a Swift template file (`packages/executor-swift/Sources/Executor/{App}Templates.swift`).
+The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`) and a TypeScript template module (`packages/mcp-server/src/templates/{app}.ts`).
 
-The adapter maps generic CRUD operations (`list`, `get`, `search`, `create`, `update`, `delete`, `action`) to `{templateId, parameters}` pairs. The Swift executor dispatches by template ID prefix (e.g. `notes.create_note` → `NotesTemplates.build()`).
+The adapter maps generic CRUD operations (`list`, `get`, `search`, `create`, `update`, `delete`, `action`) to `{templateId, parameters}` pairs. The template dispatcher routes by template ID prefix (e.g. `notes.create_note` → `notes.build()`).
 
 Apps that don't support an operation throw `UnsupportedOperationError`.
 
@@ -52,11 +50,13 @@ Modes are cumulative and configurable via `config.modes`. Tool-to-mode mapping c
 
 Mode changes use `RegisteredTool.enable()/disable()` and emit `notifications/tools/list_changed`.
 
-## IPC Contract (Node ↔ Swift)
+## Executor
 
-Request: `{ action: "template", templateId: "notes.create_note", bundleId: "com.apple.Notes", params: {...} }`
+The executor uses `child_process.execFile('osascript', ['-e', script])` — no shell involved. Error classification maps osascript stderr patterns to error codes:
 
-Response: `{ ok: true, result: {...}, humanSummary: "..." }` or `{ ok: false, error: { code: "AUTOMATION_DENIED", message: "..." } }`
+- `-1743` → `AUTOMATION_DENIED`
+- `-600`/`-10810` → `APP_NOT_RUNNING`
+- Other → `SCRIPT_ERROR`
 
 Error codes: `AUTOMATION_DENIED`, `APP_NOT_RUNNING`, `SCRIPT_ERROR`, `TIMEOUT`, `INVALID_REQUEST`, `EXECUTOR_FAILED`, `POLICY_DENIED`, `CONFIG_ERROR`, `UNKNOWN_ERROR`
 
@@ -70,11 +70,10 @@ Error codes: `AUTOMATION_DENIED`, `APP_NOT_RUNNING`, `SCRIPT_ERROR`, `TIMEOUT`, 
 - **Module system**: ESM (`"type": "module"`), `.js` extensions in imports. Target ES2022, `Node16` module resolution.
 - **Strict TS**: `strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `noUncheckedIndexedAccess`.
 
-### Swift
-- Swift 6.0 toolchain, macOS 12+ target.
-- One `{App}Templates.swift` per app. Each has a `static func build(templateId:bundleId:parameters:)`.
-- Template dispatch in `AppleScriptRunner.buildTemplateScript()` routes by template ID prefix.
-- All AppleScript parameters must be escaped/sanitized in templates.
+### Template Escaping
+- `esc()` — compile-time: escapes `\` and `"` for embedding user params in AppleScript string literals.
+- `jsonEscHandlers` — runtime: AppleScript handlers appended to every script for safe JSON output.
+- `wrapScript()` appends the jsonEsc/replaceText handlers to every template script.
 
 ### Template ID Convention
 Template IDs follow `{appPrefix}.{operation}` format: `notes.create_note`, `calendar.list_events`, `finder.move_item`. The prefix must match the adapter's `info.name`.
@@ -83,11 +82,11 @@ Template IDs follow `{appPrefix}.{operation}` format: `notes.create_note`, `cale
 
 1. Create `packages/mcp-server/src/adapters/{app}.ts` implementing `ResourceAdapter`
 2. Register it in `packages/mcp-server/src/adapters/index.ts` and in `createServer()` in `server.ts`
-3. Create `packages/executor-swift/Sources/Executor/{App}Templates.swift` with `static func build(...)`
-4. Add the prefix case to `AppleScriptRunner.buildTemplateScript()`
+3. Create `packages/mcp-server/src/templates/{app}.ts` with `export function build(templateId, bundleId, parameters)`
+4. Add the prefix to the `builders` map in `packages/mcp-server/src/templates/index.ts`
 5. Add app config and policy entries
 6. Write unit tests in `test/unit/adapters.test.ts`
 
 ## CI
 
-GitHub Actions on `macos-latest` runs: lint → build → unit tests → `swift build -c release` → `swift test` → integration tests.
+GitHub Actions on `macos-latest` runs: lint → build → unit tests → integration tests.

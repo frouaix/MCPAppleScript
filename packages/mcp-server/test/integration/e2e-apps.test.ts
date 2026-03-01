@@ -2,7 +2,7 @@
  * End-to-end tests for all 10 Apple apps via the MCP server.
  *
  * These tests spawn the real MCP server and communicate via JSON-RPC over
- * stdio, exercising the full pipeline: server → adapter → Swift executor → macOS app.
+ * stdio, exercising the full pipeline: server → adapter → osascript → macOS app.
  *
  * Requirements:
  *   - macOS with automation permissions granted for the test runner

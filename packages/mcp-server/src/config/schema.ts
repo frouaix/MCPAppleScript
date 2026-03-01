@@ -49,7 +49,6 @@ export const ModesConfigSchema = z.object({
 export type ModesConfig = z.infer<typeof ModesConfigSchema>;
 
 export const ConfigSchema = z.object({
-  executorPath: z.string().default("applescript-executor"),
   defaultTimeoutMs: z.number().int().positive().default(12000),
   defaultMode: OperationModeSchema.default("readonly"),
   modes: ModesConfigSchema.default({}),

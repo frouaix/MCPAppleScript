@@ -49,16 +49,6 @@ jobs:
       - name: Run unit tests
         run: pnpm test:unit
       
-      - name: Build Swift executor
-        run: |
-          cd packages/executor-swift
-          swift build -c release
-      
-      - name: Run Swift tests
-        run: |
-          cd packages/executor-swift
-          swift test
-      
       - name: Run integration tests
         run: pnpm test:integration
         env:

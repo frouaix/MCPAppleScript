@@ -37,7 +37,6 @@ Support a config file at:
 Example config.json:
 ```
 {
-  "executorPath": "/usr/local/bin/applescript-executor",
   "defaultTimeoutMs": 12000,
   "apps": {
     "com.apple.Notes": {

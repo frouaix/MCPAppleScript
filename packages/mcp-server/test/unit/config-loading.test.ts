@@ -45,10 +45,10 @@ describe("config loading", () => {
   describe("loadConfigFromFile", () => {
     it("should load and parse valid JSON", () => {
       const configPath = join(TEST_DIR, "valid.json");
-      writeFileSync(configPath, JSON.stringify({ executorPath: "/test" }));
+      writeFileSync(configPath, JSON.stringify({ defaultTimeoutMs: 5000 }));
 
       const result = loadConfigFromFile(configPath);
-      assert.deepStrictEqual(result, { executorPath: "/test" });
+      assert.deepStrictEqual(result, { defaultTimeoutMs: 5000 });
     });
 
     it("should throw on invalid JSON", () => {
@@ -65,14 +65,12 @@ describe("config loading", () => {
       writeFileSync(
         configPath,
         JSON.stringify({
-          executorPath: "/custom/executor",
           defaultTimeoutMs: 5000,
         })
       );
       process.env["APPLESCRIPT_MCP_CONFIG"] = configPath;
 
       const config = loadConfig();
-      assert.equal(config.executorPath, "/custom/executor");
       assert.equal(config.defaultTimeoutMs, 5000);
     });
 

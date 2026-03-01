@@ -2,11 +2,10 @@
 set -e
 
 # MCP-AppleScript Install Script
-# Builds and installs the MCP server and Swift executor
+# Builds and installs the MCP server
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/applescript-mcp"
-EXECUTOR_INSTALL_PATH="/usr/local/bin/applescript-executor"
 
 echo "🔧 MCP-AppleScript Installer"
 echo "=============================="
@@ -15,12 +14,9 @@ echo ""
 # Check prerequisites
 command -v node >/dev/null 2>&1 || { echo "❌ Node.js is required. Install from https://nodejs.org"; exit 1; }
 command -v pnpm >/dev/null 2>&1 || { echo "❌ pnpm is required. Install with: npm install -g pnpm"; exit 1; }
-command -v swift >/dev/null 2>&1 || { echo "❌ Swift is required. Install Xcode Command Line Tools."; exit 1; }
 
 NODE_VERSION=$(node --version)
-SWIFT_VERSION=$(swift --version 2>&1 | head -1)
 echo "✓ Node.js $NODE_VERSION"
-echo "✓ $SWIFT_VERSION"
 echo ""
 
 # Install Node dependencies
@@ -35,40 +31,12 @@ cd "$REPO_DIR/packages/mcp-server"
 pnpm build
 echo ""
 
-# Build Swift executor
-echo "🏗️  Building Swift executor..."
-cd "$REPO_DIR/packages/executor-swift"
-swift build -c release
-echo ""
-
-# Install executor binary
-echo "📥 Installing executor binary..."
-EXECUTOR_BIN="$REPO_DIR/packages/executor-swift/.build/release/applescript-executor"
-if [ -f "$EXECUTOR_BIN" ]; then
-    sudo cp "$EXECUTOR_BIN" "$EXECUTOR_INSTALL_PATH"
-    sudo chmod +x "$EXECUTOR_INSTALL_PATH"
-    echo "✓ Installed to $EXECUTOR_INSTALL_PATH"
-else
-    echo "⚠️  Release binary not found, trying debug build..."
-    EXECUTOR_BIN="$REPO_DIR/packages/executor-swift/.build/debug/applescript-executor"
-    if [ -f "$EXECUTOR_BIN" ]; then
-        sudo cp "$EXECUTOR_BIN" "$EXECUTOR_INSTALL_PATH"
-        sudo chmod +x "$EXECUTOR_INSTALL_PATH"
-        echo "✓ Installed to $EXECUTOR_INSTALL_PATH"
-    else
-        echo "❌ Could not find executor binary"
-        exit 1
-    fi
-fi
-echo ""
-
 # Create config directory and default config
 echo "⚙️  Setting up configuration..."
 mkdir -p "$CONFIG_DIR"
 if [ ! -f "$CONFIG_DIR/config.json" ]; then
     cat > "$CONFIG_DIR/config.json" << 'EOF'
 {
-  "executorPath": "/usr/local/bin/applescript-executor",
   "defaultTimeoutMs": 12000,
   "apps": {
     "com.apple.Notes": {

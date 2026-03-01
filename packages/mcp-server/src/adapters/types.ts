@@ -98,7 +98,7 @@ export interface ActionResult {
 
 /**
  * Common adapter interface that each Apple app implements.
- * All methods return template IDs and parameters for the Swift executor.
+ * All methods return template IDs and parameters for the executor.
  */
 export interface ResourceAdapter {
   readonly info: AppInfo;

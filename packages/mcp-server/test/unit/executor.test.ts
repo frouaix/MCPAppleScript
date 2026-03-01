@@ -11,100 +11,103 @@ function makeRequest(overrides: Partial<ExecutorRequest> = {}): ExecutorRequest 
     requestId: "test-123",
     bundleId: "com.apple.Notes",
     mode: "template",
-    templateId: "notes.create_note.v1",
+    templateId: "notes.list_folders",
     parameters: {},
     timeoutMs: 5000,
     ...overrides,
   };
 }
 
-function mockExecutor(script: string) {
-  return {
-    executablePath: "node",
-    executableArgs: ["-e", script],
-    logger: silentLogger,
-  };
-}
+const opts = { logger: silentLogger };
 
 describe("executor", () => {
-  it("should parse a valid success response", async () => {
-    const req = makeRequest();
-    const result = await runExecutor(
-      req,
-      mockExecutor(
-        `let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const r=JSON.parse(d);process.stdout.write(JSON.stringify({requestId:r.requestId,ok:true,result:{done:true},stdout:"",stderr:""}))})`
-      )
-    );
+  it("should return script in dry run mode (template)", async () => {
+    const req = makeRequest({ dryRun: true });
+    const result = await runExecutor(req, opts);
     assert.equal(result.ok, true);
-    assert.equal(result.requestId, "test-123");
     if (result.ok) {
-      assert.equal(result.result.done, true);
+      assert.ok(typeof result.result.script === "string");
+      assert.ok((result.result.script as string).includes("tell application"));
     }
   });
 
-  it("should parse an error response", async () => {
-    const req = makeRequest();
-    const result = await runExecutor(
-      req,
-      mockExecutor(
-        `process.stdout.write(JSON.stringify({requestId:"test-123",ok:false,error:{code:"SCRIPT_ERROR",message:"bad script"}}))`
-      )
-    );
+  it("should return script in dry run mode (raw)", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: 'return "hello"',
+      dryRun: true,
+    });
+    const result = await runExecutor(req, opts);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.result.script, 'return "hello"');
+    }
+  });
+
+  it("should throw on template mode without templateId", async () => {
+    const req = makeRequest({ templateId: undefined });
+    await assert.rejects(() => runExecutor(req, opts), /templateId is required/);
+  });
+
+  it("should throw on raw mode without script", async () => {
+    const req = makeRequest({ mode: "raw", script: undefined });
+    await assert.rejects(() => runExecutor(req, opts), /script is required/);
+  });
+
+  it("should throw on unknown template prefix", async () => {
+    const req = makeRequest({ templateId: "unknown.action", dryRun: true });
+    await assert.rejects(() => runExecutor(req, opts), /Unknown template prefix/);
+  });
+
+  it("should execute a simple osascript and return result", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: 'return "{\\"ok\\":true}"',
+      timeoutMs: 5000,
+    });
+    const result = await runExecutor(req, opts);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.result.ok, true);
+    }
+  });
+
+  it("should handle osascript errors", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: "this is not valid applescript at all",
+      timeoutMs: 5000,
+    });
+    const result = await runExecutor(req, opts);
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.error.code, "SCRIPT_ERROR");
-      assert.equal(result.error.message, "bad script");
     }
   });
 
-  it("should forward request parameters via stdin", async () => {
-    const req = makeRequest({ parameters: { title: "My Note" } });
-    const result = await runExecutor(
-      req,
-      mockExecutor(
-        `let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const r=JSON.parse(d);process.stdout.write(JSON.stringify({requestId:r.requestId,ok:true,result:{title:r.parameters.title},stdout:"",stderr:""}))})`
-      )
-    );
+  it("should handle timeout", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: "delay 30",
+      timeoutMs: 500,
+    });
+    const result = await runExecutor(req, opts);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.error.code, "TIMEOUT");
+    }
+  });
+
+  it("should handle non-JSON osascript output as text", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: 'return "hello world"',
+      timeoutMs: 5000,
+    });
+    const result = await runExecutor(req, opts);
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.result.title, "My Note");
+      assert.equal(result.result.text, "hello world");
     }
-  });
-
-  it("should reject on invalid JSON output", async () => {
-    const req = makeRequest();
-    await assert.rejects(
-      () => runExecutor(req, mockExecutor(`process.stdout.write("not json")`)),
-      (err: Error) => {
-        assert.ok(err.message.includes("Invalid JSON"));
-        return true;
-      }
-    );
-  });
-
-  it("should reject on timeout", async () => {
-    const req = makeRequest({ timeoutMs: 200 });
-    await assert.rejects(
-      () => runExecutor(req, mockExecutor(`setTimeout(()=>{},10000)`)),
-      (err: Error) => {
-        assert.ok(err.message.includes("timed out"));
-        return true;
-      }
-    );
-  });
-
-  it("should reject when executable not found", async () => {
-    const req = makeRequest();
-    await assert.rejects(
-      () =>
-        runExecutor(req, {
-          executablePath: "/nonexistent/binary",
-          logger: silentLogger,
-        }),
-      (err: Error) => {
-        assert.ok(err.message.includes("Failed to spawn"));
-        return true;
-      }
-    );
   });
 });

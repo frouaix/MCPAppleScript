@@ -17,7 +17,10 @@ pnpm build
 ## Project Structure
 
 - `packages/mcp-server/` — TypeScript MCP server (Node.js)
-- `packages/executor-swift/` — Swift executor for AppleScript execution
+  - `src/adapters/` — Per-app resource adapters
+  - `src/templates/` — AppleScript template builders (one per app)
+  - `src/exec/` — osascript executor
+  - `src/http.ts` — Streamable HTTP transport
 - `docs/` — Architecture and design documentation
 
 ## Running Tests
@@ -41,11 +44,6 @@ pnpm test
 - ESLint for linting
 - Use `node:test` for testing (no external test frameworks)
 
-### Swift
-- Standard Swift conventions
-- Foundation/AppKit for AppleScript APIs
-- Use `swift build` for building
-
 ## Making Changes
 
 1. Create a branch from `main`
@@ -53,37 +51,15 @@ pnpm test
 3. Run `pnpm build && pnpm test` to verify
 4. Open a pull request
 
-## Adding a New Tool
+## Adding a New App
 
-1. Register the tool in `packages/mcp-server/src/server.ts` with a Zod input schema
-2. Add the corresponding template in `packages/executor-swift/Sources/Executor/AppleScriptRunner.swift`
-3. Update the Swift request dispatcher in `main.swift`
-4. Add policy configuration for the target app
-5. Write unit tests and integration tests
-6. Update README.md with the new tool
-
-## IPC Contract
-
-The TypeScript server communicates with the Swift executor via JSON over stdin/stdout:
-
-**Request** (server → executor):
-```json
-{
-  "action": "template",
-  "templateId": "notes.create_note",
-  "bundleId": "com.apple.Notes",
-  "params": { "title": "Hello", "body": "World" }
-}
-```
-
-**Response** (executor → server):
-```json
-{
-  "ok": true,
-  "result": { "noteId": "..." },
-  "humanSummary": "Created note 'Hello' in Notes"
-}
-```
+1. Create `packages/mcp-server/src/adapters/{app}.ts` implementing `ResourceAdapter`
+2. Register in `adapters/index.ts` and `server.ts`
+3. Create `packages/mcp-server/src/templates/{app}.ts` with `export function build()`
+4. Add to the `builders` map in `templates/index.ts`
+5. Add policy configuration for the target app
+6. Write unit tests and integration tests
+7. Update README.md with the new app
 
 ## License
 

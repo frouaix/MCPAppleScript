@@ -60,7 +60,6 @@ export function createServer(deps: ServerDeps): McpServer {
   );
 
   const executorOptions: ExecutorOptions = {
-    executablePath: config.executorPath,
     logger,
   };
 
@@ -84,7 +83,7 @@ export function createServer(deps: ServerDeps): McpServer {
     }
   }
 
-  /** Execute a template via the Swift executor and return MCP tool result. */
+  /** Execute a template via osascript and return MCP tool result. */
   async function executeTemplate(
     templateId: string,
     bundleId: string,
@@ -472,7 +471,6 @@ export function createServer(deps: ServerDeps): McpServer {
   logger.info("MCP server created", {
     version: VERSION,
     mode: modeManager.getMode(),
-    executorPath: config.executorPath,
     toolCount: registeredTools.size,
     enabledTools: modeManager.getEnabledTools(),
     apps: appNames,
