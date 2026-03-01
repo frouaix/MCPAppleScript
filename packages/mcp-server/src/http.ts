@@ -38,7 +38,7 @@ export async function startHttp(opts: HttpOptions): Promise<void> {
         return;
       }
       const transport = sessions.get(sessionId)!;
-      await transport.handleRequest(req, res);
+      await transport.handleRequest(req, res, req.body);
       if (req.method === "DELETE") {
         sessions.delete(sessionId);
         logger.debug("Session deleted", { sessionId });
@@ -49,7 +49,7 @@ export async function startHttp(opts: HttpOptions): Promise<void> {
     // POST — either initialize or continue
     if (sessionId && sessions.has(sessionId)) {
       const transport = sessions.get(sessionId)!;
-      await transport.handleRequest(req, res);
+      await transport.handleRequest(req, res, req.body);
       return;
     }
 
@@ -76,7 +76,7 @@ export async function startHttp(opts: HttpOptions): Promise<void> {
       logger.debug("Session closed", { sessionId: newSessionId });
     };
 
-    await transport.handleRequest(req, res);
+    await transport.handleRequest(req, res, req.body);
   });
 
   // Health check
