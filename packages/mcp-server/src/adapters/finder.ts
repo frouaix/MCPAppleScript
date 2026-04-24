@@ -1,6 +1,7 @@
 import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  CreateParams, UpdateParams, ActionParams,
+  UnsupportedOperationError, ValidationContext, ValidationResult,
 } from "./types.js";
 import { z } from "zod";
 import { homedir } from "node:os";
@@ -44,35 +45,6 @@ function normalizePath(raw: string): string {
   return p;
 }
 
-/**
- * Validate that a path is within the allowed paths.
- * Default behavior: if allowedPaths is empty, deny all.
- */
-function validateFinderPath(path: string, allowedPaths: string[]): void {
-  const normalized = normalizePath(path);
-
-  // Empty allowlist = deny all
-  if (allowedPaths.length === 0) {
-    throw new Error(
-      `Finder access denied: path "${path}" is not allowed. ` +
-      "Configure allowedPaths in finder section of config to enable Finder access."
-    );
-  }
-
-  // Check if path starts with any allowed path
-  const isAllowed = allowedPaths.some((allowed) => {
-    const normalizedAllowed = normalizePath(allowed);
-    return normalized === normalizedAllowed || normalized.startsWith(normalizedAllowed + "/");
-  });
-
-  if (!isAllowed) {
-    throw new Error(
-      `Finder access denied: path "${path}" is not within any allowed path. ` +
-      `Allowed paths: ${allowedPaths.join(", ")}`
-    );
-  }
-}
-
 export class FinderAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
     name: "finder",
@@ -86,6 +58,7 @@ export class FinderAdapter implements ResourceAdapter {
     itemType: "file",
     containerType: "folder",
     propertiesSchema: finderPropertiesSchema,
+    requiredValidation: ["containerId", "id", "properties", "parameters"],
   };
 
   listContainers() {
@@ -158,7 +131,77 @@ export class FinderAdapter implements ResourceAdapter {
     }
   }
 
-  validatePath(path: string, allowedPaths: string[]): void {
-    validateFinderPath(path, allowedPaths);
+  validateParams(
+    params: Record<string, unknown>,
+    context: ValidationContext
+  ): ValidationResult {
+    const { allowedPaths } = context.finderConfig;
+
+    // Empty allowlist = deny all
+    if (allowedPaths.length === 0) {
+      return {
+        valid: false,
+        error: 'Finder access denied: no paths configured. Set "finder.allowedPaths" in config to enable Finder access (e.g. ["~/Documents", "~/Desktop"]).',
+      };
+    }
+
+    const pathsToCheck: string[] = [];
+
+    // containerId is used as path for list/search/create (defaults to "~")
+    const containerId = params["containerId"] as string | undefined;
+    if (containerId) {
+      pathsToCheck.push(containerId);
+    } else if (params["containerId"] !== undefined || this._hasListContainersParam(params)) {
+      pathsToCheck.push("~");
+    }
+
+    // id is used as path for get/delete
+    const id = params["id"] as string | undefined;
+    if (id) {
+      pathsToCheck.push(id);
+    }
+
+    // properties may contain parentPath (create) or destPath (update)
+    const properties = params["properties"] as Record<string, unknown> | undefined;
+    if (properties) {
+      const pp = properties["parentPath"] as string | undefined;
+      if (pp) pathsToCheck.push(pp);
+      const dp = properties["destPath"] as string | undefined;
+      if (dp) pathsToCheck.push(dp);
+    }
+
+    // action parameters may contain path, sourcePath, destPath
+    const actionParams = params["parameters"] as Record<string, unknown> | undefined;
+    if (actionParams) {
+      for (const key of ["path", "sourcePath", "destPath"]) {
+        const val = actionParams[key] as string | undefined;
+        if (val) pathsToCheck.push(val);
+      }
+    }
+
+    // Validate each path against the allowlist
+    for (const path of pathsToCheck) {
+      const normalized = normalizePath(path);
+      const isAllowed = allowedPaths.some((allowed) => {
+        const normalizedAllowed = normalizePath(allowed);
+        return normalized === normalizedAllowed || normalized.startsWith(normalizedAllowed + "/");
+      });
+      if (!isAllowed) {
+        return {
+          valid: false,
+          error: `Finder access denied: path "${path}" is not within any allowed path. Allowed paths: ${allowedPaths.join(", ")}`,
+        };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  // Track whether we've seen a containerId param to distinguish
+  // between "not provided" and "provided but empty"
+  private _hasListContainersParam(params: Record<string, unknown>): boolean {
+    // list_containers handler passes { app, dryRun } only
+    // We detect this by checking if containerId was explicitly passed
+    return "containerId" in params;
   }
 }

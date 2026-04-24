@@ -20,6 +20,7 @@ export class MessagesAdapter implements ResourceAdapter {
     },
     itemType: "message",
     containerType: "chat",
+    requiredValidation: [],
   };
 
   listContainers() {

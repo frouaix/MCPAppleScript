@@ -19,6 +19,7 @@ export class MusicAdapter implements ResourceAdapter {
     },
     itemType: "track",
     containerType: "playlist",
+    requiredValidation: [],
   };
 
   listContainers() {

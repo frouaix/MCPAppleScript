@@ -8,6 +8,21 @@
 
 import { z } from "zod";
 
+/**
+ * Context passed to adapter.validateParams() containing all runtime config.
+ * Adapters access only the fields they care about.
+ */
+export interface ValidationContext {
+  finderConfig: { allowedPaths: string[] };
+  safariConfig: { doJavaScript: boolean };
+}
+
+/** Result of adapter parameter validation. */
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
 /** A container that holds items (folder, calendar, mailbox, playlist, etc.). */
 export interface Container {
   id: string;
@@ -59,6 +74,12 @@ export interface AppInfo {
   containerType: string;
   /** Optional Zod schema for validating create/update properties. */
   propertiesSchema?: z.ZodType<Record<string, unknown>>;
+  /**
+   * Names of raw MCP tool parameters that require validation.
+   * The adapter's validateParams() will be called with these params
+   * before the operation executes.
+   */
+  requiredValidation?: string[];
 }
 
 /** Parameters for the list operation. */
@@ -117,12 +138,12 @@ export interface ResourceAdapter {
   action(params: ActionParams): { templateId: string; parameters: Record<string, unknown> };
 
   /**
-   * Optional method for path validation. Adapters that operate on file system
-   * paths implement this to restrict access to allowed paths.
-   * Called before executing operations that access paths.
-   * @throws Error if the path is not allowed
+   * Validate raw MCP tool parameters against adapter-specific rules.
+   * Called before operations that access sensitive resources.
+   * Adapters with requiredValidation list params that trigger this check.
+   * @returns { valid: true } if allowed, or { valid: false, error: string } with a user-facing message
    */
-  validatePath?(path: string, allowedPaths: string[]): void;
+  validateParams?(params: Record<string, unknown>, context: ValidationContext): ValidationResult;
 }
 
 export class UnsupportedOperationError extends Error {

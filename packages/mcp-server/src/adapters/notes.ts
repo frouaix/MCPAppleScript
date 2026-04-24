@@ -22,6 +22,7 @@ export class NotesAdapter implements ResourceAdapter {
     itemType: "note",
     containerType: "folder",
     propertiesSchema: notesPropertiesSchema,
+    requiredValidation: [],
   };
 
   listContainers() {

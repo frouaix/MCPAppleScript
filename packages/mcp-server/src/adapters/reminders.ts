@@ -24,6 +24,7 @@ export class RemindersAdapter implements ResourceAdapter {
     itemType: "reminder",
     containerType: "list",
     propertiesSchema: remindersPropertiesSchema,
+    requiredValidation: [],
   };
 
   listContainers() {

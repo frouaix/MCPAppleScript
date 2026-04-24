@@ -25,6 +25,7 @@ export class ContactsAdapter implements ResourceAdapter {
     itemType: "person",
     containerType: "group",
     propertiesSchema: contactsPropertiesSchema,
+    requiredValidation: [],
   };
 
   listContainers() {

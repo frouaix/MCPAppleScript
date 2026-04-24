@@ -25,6 +25,7 @@ export class CalendarAdapter implements ResourceAdapter {
     itemType: "event",
     containerType: "calendar",
     propertiesSchema: calendarPropertiesSchema,
+    requiredValidation: [],
   };
 
   listContainers() {

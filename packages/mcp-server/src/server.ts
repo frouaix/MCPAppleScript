@@ -121,7 +121,11 @@ export function createServer(deps: ServerDeps): McpServer {
   registerSystemTools({ server, registerTool, modeManager, logger, appNames });
 
   // Register CRUD tools (list_containers, list, get, search, create, update, delete, action)
-  registerCrudTools({ server, registerTool, appRegistry, policy, executeTemplate, confirmation, safariConfig: config.safari, finderConfig: config.finder });
+  const validationContext: import("../adapters/types.js").ValidationContext = {
+    finderConfig: config.finder,
+    safariConfig: config.safari,
+  };
+  registerCrudTools({ server, registerTool, appRegistry, policy, executeTemplate, confirmation, validationContext });
 
   // Register script tools (run_template, run_script)
   registerScriptTools({ server, registerTool, policy, confirmation, config, executorOptions });

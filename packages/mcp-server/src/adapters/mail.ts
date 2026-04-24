@@ -22,6 +22,7 @@ export class MailAdapter implements ResourceAdapter {
     itemType: "message",
     containerType: "mailbox",
     propertiesSchema: mailPropertiesSchema,
+    requiredValidation: [],
   };
 
   listContainers() {

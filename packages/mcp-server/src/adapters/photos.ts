@@ -20,6 +20,7 @@ export class PhotosAdapter implements ResourceAdapter {
     },
     itemType: "media",
     containerType: "album",
+    requiredValidation: [],
   };
 
   listContainers() {

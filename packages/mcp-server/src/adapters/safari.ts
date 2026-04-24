@@ -1,6 +1,7 @@
 import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  CreateParams, UpdateParams, ActionParams,
+  UnsupportedOperationError, ValidationContext, ValidationResult,
 } from "./types.js";
 import { z } from "zod";
 
@@ -29,6 +30,7 @@ export class SafariAdapter implements ResourceAdapter {
     itemType: "tab",
     containerType: "window",
     propertiesSchema: safariPropertiesSchema,
+    requiredValidation: ["action", "parameters"],
   };
 
   listContainers() {
@@ -101,5 +103,19 @@ export class SafariAdapter implements ResourceAdapter {
       default:
         throw new UnsupportedOperationError("safari", params.action);
     }
+  }
+
+  validateParams(
+    params: Record<string, unknown>,
+    context: ValidationContext
+  ): ValidationResult {
+    const action = params["action"] as string | undefined;
+    if (action === "do_javascript" && !context.safariConfig.doJavaScript) {
+      return {
+        valid: false,
+        error: "safari.do_javascript is disabled. Enable it in config by setting safari.doJavaScript to true.",
+      };
+    }
+    return { valid: true };
   }
 }
