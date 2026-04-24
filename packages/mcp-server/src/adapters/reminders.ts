@@ -2,6 +2,15 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+
+const remindersPropertiesSchema = z.object({
+  name: z.string().optional(),
+  body: z.string().optional(),
+  dueDate: z.string().optional(),
+  priority: z.number().optional(),
+  flagged: z.boolean().optional(),
+}).passthrough();
 
 export class RemindersAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -14,6 +23,7 @@ export class RemindersAdapter implements ResourceAdapter {
     },
     itemType: "reminder",
     containerType: "list",
+    propertiesSchema: remindersPropertiesSchema,
   };
 
   listContainers() {

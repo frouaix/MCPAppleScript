@@ -2,6 +2,16 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+
+const contactsPropertiesSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  organization: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  groupId: z.string().optional(),
+}).passthrough();
 
 export class ContactsAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -14,6 +24,7 @@ export class ContactsAdapter implements ResourceAdapter {
     },
     itemType: "person",
     containerType: "group",
+    propertiesSchema: contactsPropertiesSchema,
   };
 
   listContainers() {

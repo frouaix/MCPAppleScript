@@ -2,6 +2,13 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+
+const mailPropertiesSchema = z.object({
+  to: z.string().optional(),
+  subject: z.string().optional(),
+  body: z.string().optional(),
+}).passthrough();
 
 export class MailAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -14,6 +21,7 @@ export class MailAdapter implements ResourceAdapter {
     },
     itemType: "message",
     containerType: "mailbox",
+    propertiesSchema: mailPropertiesSchema,
   };
 
   listContainers() {

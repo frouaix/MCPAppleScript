@@ -2,6 +2,16 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+
+const calendarPropertiesSchema = z.object({
+  title: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  location: z.string().optional(),
+  notes: z.string().optional(),
+  allDay: z.boolean().optional(),
+}).passthrough();
 
 export class CalendarAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -14,6 +24,7 @@ export class CalendarAdapter implements ResourceAdapter {
     },
     itemType: "event",
     containerType: "calendar",
+    propertiesSchema: calendarPropertiesSchema,
   };
 
   listContainers() {

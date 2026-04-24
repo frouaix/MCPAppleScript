@@ -6,6 +6,8 @@
  * of operations throw UnsupportedOperationError for the rest.
  */
 
+import { z } from "zod";
+
 /** A container that holds items (folder, calendar, mailbox, playlist, etc.). */
 export interface Container {
   id: string;
@@ -55,6 +57,8 @@ export interface AppInfo {
   itemType: string;
   /** Description of containers this app uses. */
   containerType: string;
+  /** Optional Zod schema for validating create/update properties. */
+  propertiesSchema?: z.ZodType<Record<string, unknown>>;
 }
 
 /** Parameters for the list operation. */

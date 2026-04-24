@@ -2,6 +2,7 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
 
 /**
  * Safari adapter. Tab/window browsing model, not traditional CRUD.
@@ -10,6 +11,11 @@ import {
  * - No "update" in the traditional sense
  * - Actions: do_javascript, add_reading_list
  */
+const safariPropertiesSchema = z.object({
+  url: z.string().optional(),
+  newWindow: z.boolean().optional(),
+}).passthrough();
+
 export class SafariAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
     name: "safari",
@@ -22,6 +28,7 @@ export class SafariAdapter implements ResourceAdapter {
     },
     itemType: "tab",
     containerType: "window",
+    propertiesSchema: safariPropertiesSchema,
   };
 
   listContainers() {

@@ -1,6 +1,6 @@
 import { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { AppRegistry } from "../adapters/index.js";
+import { AppRegistry, ResourceAdapter } from "../adapters/index.js";
 import { PolicyEngine } from "../policy/policy.js";
 
 export type ExecuteTemplateFn = (
@@ -24,6 +24,19 @@ function createAppParam(appRegistry: AppRegistry) {
   return z.enum(appNames as [string, ...string[]]).describe(
     `Target app: ${appNames.join(", ")}`
   );
+}
+
+function validateProperties(adapter: ResourceAdapter, properties: unknown, operation: string): Record<string, unknown> {
+  const schema = adapter.info.propertiesSchema;
+  if (schema) {
+    const result = schema.safeParse(properties);
+    if (!result.success) {
+      const fields = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ");
+      throw new Error(`Invalid ${operation} properties for ${adapter.info.displayName}: ${fields}`);
+    }
+    return result.data;
+  }
+  return properties as Record<string, unknown>;
 }
 
 export function registerCrudTools(deps: CrudToolDeps): void {
@@ -134,7 +147,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, containerId, properties, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.create", bundleId: adapter.info.bundleId });
-        const { templateId, parameters } = adapter.create({ containerId, properties });
+        const validatedProperties = validateProperties(adapter, properties, "create");
+        const { templateId, parameters } = adapter.create({ containerId, properties: validatedProperties });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
@@ -158,6 +172,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.update", bundleId: adapter.info.bundleId });
 
+        const validatedProperties = validateProperties(adapter, properties, "update");
+
         const confirmResult = await confirmation.requestConfirmation(
           "app.update",
           `Update ${adapter.info.itemType} "${id}" in ${adapter.info.displayName}`,
@@ -167,7 +183,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           return { content: [{ type: "text", text: confirmResult.message }] };
         }
 
-        const { templateId, parameters } = adapter.update({ id, properties });
+        const { templateId, parameters } = adapter.update({ id, properties: validatedProperties });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )

@@ -2,6 +2,13 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+
+const notesPropertiesSchema = z.object({
+  title: z.string().optional(),
+  body: z.string().optional(),
+  folderId: z.string().optional(),
+}).passthrough();
 
 export class NotesAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -14,6 +21,7 @@ export class NotesAdapter implements ResourceAdapter {
     },
     itemType: "note",
     containerType: "folder",
+    propertiesSchema: notesPropertiesSchema,
   };
 
   listContainers() {

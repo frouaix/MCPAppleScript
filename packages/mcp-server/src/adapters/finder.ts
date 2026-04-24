@@ -2,11 +2,18 @@ import {
   ResourceAdapter, AppInfo, ListParams, SearchParams,
   CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
 
 /**
  * Finder adapter. Uses POSIX paths as IDs.
  * Containers are folders, items are files/folders within them.
  */
+const finderPropertiesSchema = z.object({
+  name: z.string().optional(),
+  parentPath: z.string().optional(),
+  destPath: z.string().optional(),
+}).passthrough();
+
 export class FinderAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
     name: "finder",
@@ -19,6 +26,7 @@ export class FinderAdapter implements ResourceAdapter {
     },
     itemType: "file",
     containerType: "folder",
+    propertiesSchema: finderPropertiesSchema,
   };
 
   listContainers() {
