@@ -17,6 +17,7 @@ export interface CrudToolDeps {
   policy: PolicyEngine;
   executeTemplate: ExecuteTemplateFn;
   confirmation: import("../mode/confirmation.js").ConfirmationManager;
+  safariConfig: import("../config/schema.js").SafariConfig;
 }
 
 function createAppParam(appRegistry: AppRegistry) {
@@ -40,7 +41,7 @@ function validateProperties(adapter: ResourceAdapter, properties: unknown, opera
 }
 
 export function registerCrudTools(deps: CrudToolDeps): void {
-  const { server, registerTool, appRegistry, policy, executeTemplate, confirmation } = deps;
+  const { server, registerTool, appRegistry, policy, executeTemplate, confirmation, safariConfig } = deps;
   const appParam = createAppParam(appRegistry);
   const dryRunParam = z.boolean().optional().describe("If true, return the generated script without executing it");
 
@@ -237,6 +238,14 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, action, parameters: actionParams, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.action", bundleId: adapter.info.bundleId });
+
+        if (action === "do_javascript" && !safariConfig.doJavaScript) {
+          return {
+            content: [{ type: "text", text: "safari.do_javascript is disabled. Enable it in config.safari.doJavaScript to use." }],
+            isError: true,
+          };
+        }
+
         const { templateId, parameters } = adapter.action({ action, parameters: actionParams ?? {} });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }

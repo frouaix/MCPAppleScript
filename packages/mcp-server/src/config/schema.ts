@@ -14,6 +14,12 @@ export const RunScriptConfigSchema = z.object({
 
 export type RunScriptConfig = z.infer<typeof RunScriptConfigSchema>;
 
+export const SafariConfigSchema = z.object({
+  doJavaScript: z.boolean().default(false),
+});
+
+export type SafariConfig = z.infer<typeof SafariConfigSchema>;
+
 export const LoggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   redact: z.array(z.string()).default([]),
@@ -54,6 +60,7 @@ export const ConfigSchema = z.object({
   modes: ModesConfigSchema.default({}),
   apps: z.record(z.string(), AppConfigSchema).default({}),
   runScript: RunScriptConfigSchema.default({}),
+  safari: SafariConfigSchema.default({}),
   logging: LoggingConfigSchema.default({}),
 });
 
