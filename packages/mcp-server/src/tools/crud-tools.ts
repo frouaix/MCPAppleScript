@@ -18,6 +18,7 @@ export interface CrudToolDeps {
   executeTemplate: ExecuteTemplateFn;
   confirmation: import("../mode/confirmation.js").ConfirmationManager;
   safariConfig: import("../config/schema.js").SafariConfig;
+  finderConfig: import("../config/schema.js").FinderConfig;
 }
 
 function createAppParam(appRegistry: AppRegistry) {
@@ -41,9 +42,16 @@ function validateProperties(adapter: ResourceAdapter, properties: unknown, opera
 }
 
 export function registerCrudTools(deps: CrudToolDeps): void {
-  const { server, registerTool, appRegistry, policy, executeTemplate, confirmation, safariConfig } = deps;
+  const { server, registerTool, appRegistry, policy, executeTemplate, confirmation, safariConfig, finderConfig } = deps;
   const appParam = createAppParam(appRegistry);
   const dryRunParam = z.boolean().optional().describe("If true, return the generated script without executing it");
+
+  /** Call adapter.validatePath if the adapter implements it. */
+  function validateAdapterPath(adapter: ResourceAdapter, path: string): void {
+    if (adapter.validatePath) {
+      adapter.validatePath(path, finderConfig.allowedPaths);
+    }
+  }
 
   // --- app.list_containers ---
   registerTool(
@@ -60,6 +68,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.list_containers", bundleId: adapter.info.bundleId });
         const { templateId, parameters } = adapter.listContainers();
+        const defaultPath = (parameters.path as string) ?? "~";
+        validateAdapterPath(adapter, defaultPath);
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
@@ -82,6 +92,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, containerId, limit, offset, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.list", bundleId: adapter.info.bundleId });
+        const pathToValidate = containerId ?? "~";
+        validateAdapterPath(adapter, pathToValidate);
         const { templateId, parameters } = adapter.list({ containerId, limit, offset });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
@@ -103,6 +115,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, id, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.get", bundleId: adapter.info.bundleId });
+        validateAdapterPath(adapter, id);
         const { templateId, parameters } = adapter.get(id);
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
@@ -126,6 +139,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, query, containerId, limit, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.search", bundleId: adapter.info.bundleId });
+        const pathToValidate = containerId ?? "~";
+        validateAdapterPath(adapter, pathToValidate);
         const { templateId, parameters } = adapter.search({ query, containerId, limit });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
@@ -148,8 +163,12 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, containerId, properties, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.create", bundleId: adapter.info.bundleId });
+        const containerPath = containerId ?? "~";
+        validateAdapterPath(adapter, containerPath);
         const validatedProperties = validateProperties(adapter, properties, "create");
         const { templateId, parameters } = adapter.create({ containerId, properties: validatedProperties });
+        const parentPath = (parameters.parentPath as string) ?? containerPath;
+        validateAdapterPath(adapter, parentPath);
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
@@ -174,6 +193,11 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.update", bundleId: adapter.info.bundleId });
 
         const validatedProperties = validateProperties(adapter, properties, "update");
+
+        const destPath = (validatedProperties.destPath as string) ?? "";
+        if (destPath) {
+          validateAdapterPath(adapter, destPath);
+        }
 
         const confirmResult = await confirmation.requestConfirmation(
           "app.update",
@@ -206,6 +230,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
       async ({ app, id, confirmationToken, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.delete", bundleId: adapter.info.bundleId });
+
+        validateAdapterPath(adapter, id);
 
         const confirmResult = await confirmation.requestConfirmation(
           "app.delete",
@@ -244,6 +270,18 @@ export function registerCrudTools(deps: CrudToolDeps): void {
             content: [{ type: "text", text: "safari.do_javascript is disabled. Enable it in config.safari.doJavaScript to use." }],
             isError: true,
           };
+        }
+
+        // Validate paths for Finder actions
+        const params = actionParams ?? {};
+        if (adapter.info.name === "finder") {
+          const pathFields = ["path", "sourcePath", "destPath"];
+          for (const field of pathFields) {
+            const fieldValue = (params[field] as string) ?? "";
+            if (fieldValue) {
+              validateAdapterPath(adapter, fieldValue);
+            }
+          }
         }
 
         const { templateId, parameters } = adapter.action({ action, parameters: actionParams ?? {} });

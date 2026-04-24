@@ -115,6 +115,14 @@ export interface ResourceAdapter {
   update(params: UpdateParams): { templateId: string; parameters: Record<string, unknown> };
   delete(id: string): { templateId: string; parameters: Record<string, unknown> };
   action(params: ActionParams): { templateId: string; parameters: Record<string, unknown> };
+
+  /**
+   * Optional method for path validation. Adapters that operate on file system
+   * paths implement this to restrict access to allowed paths.
+   * Called before executing operations that access paths.
+   * @throws Error if the path is not allowed
+   */
+  validatePath?(path: string, allowedPaths: string[]): void;
 }
 
 export class UnsupportedOperationError extends Error {

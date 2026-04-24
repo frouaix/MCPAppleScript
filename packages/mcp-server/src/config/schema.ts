@@ -20,6 +20,12 @@ export const SafariConfigSchema = z.object({
 
 export type SafariConfig = z.infer<typeof SafariConfigSchema>;
 
+export const FinderConfigSchema = z.object({
+  allowedPaths: z.array(z.string()).default([]),
+});
+
+export type FinderConfig = z.infer<typeof FinderConfigSchema>;
+
 export const LoggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   redact: z.array(z.string()).default([]),
@@ -61,6 +67,7 @@ export const ConfigSchema = z.object({
   apps: z.record(z.string(), AppConfigSchema).default({}),
   runScript: RunScriptConfigSchema.default({}),
   safari: SafariConfigSchema.default({}),
+  finder: FinderConfigSchema.default({}),
   logging: LoggingConfigSchema.default({}),
 });
 
