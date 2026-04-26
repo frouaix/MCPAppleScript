@@ -23,6 +23,7 @@ import {
   FinderAdapter,
   SafariAdapter,
 } from "./adapters/index.js";
+import type { ValidationContext } from "./adapters/types.js";
 import {
   registerSystemTools,
   registerCrudTools,
@@ -121,7 +122,7 @@ export function createServer(deps: ServerDeps): McpServer {
   registerSystemTools({ server, registerTool, modeManager, logger, appNames });
 
   // Register CRUD tools (list_containers, list, get, search, create, update, delete, action)
-  const validationContext: import("../adapters/types.js").ValidationContext = {
+  const validationContext: ValidationContext = {
     finderConfig: config.finder,
     safariConfig: config.safari,
   };

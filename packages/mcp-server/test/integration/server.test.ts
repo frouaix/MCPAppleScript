@@ -5,7 +5,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SERVER_PATH = resolve(__dirname, "../../src/index.ts");
+const SERVER_PATH = resolve(__dirname, "../../src/index.js");
 
 function sendMessage(child: ChildProcess, message: object): void {
   child.stdin!.write(JSON.stringify(message) + "\n");

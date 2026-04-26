@@ -2,6 +2,7 @@ export type {
   ResourceAdapter, ResourceItem, Container, AppInfo,
   AdapterCapabilities, ListParams, SearchParams, CreateParams,
   UpdateParams, ActionParams, ActionResult,
+  ValidationContext, ValidationResult,
 } from "./types.js";
 export { UnsupportedOperationError } from "./types.js";
 export { AppRegistry } from "./registry.js";

@@ -8,7 +8,7 @@ export type ExecuteTemplateFn = (
   bundleId: string,
   parameters: Record<string, unknown>,
   dryRun: boolean
-) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>;
+) => Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }>;
 
 export interface CrudToolDeps {
   server: McpServer;
@@ -44,11 +44,11 @@ function validateProperties(adapter: ResourceAdapter, properties: unknown, opera
  * Run adapter-level validation if the adapter has requiredValidation params.
  * Returns an error result if validation fails, or null if validation passes/skipped.
  */
-function runValidation(
+export function runValidation(
   adapter: ResourceAdapter,
   rawParams: Record<string, unknown>,
   validationContext: ValidationContext
-): { content: Array<{ type: string; text: string }>; isError: true } | null {
+): { content: Array<{ type: "text"; text: string }>; isError: true } | null {
   const required = adapter.info.requiredValidation;
   if (!required || required.length === 0 || !adapter.validateParams) {
     return null;
@@ -56,9 +56,10 @@ function runValidation(
 
   const result = adapter.validateParams(rawParams, validationContext);
   if (!result.valid) {
+    const error = result.error ?? "Validation failed.";
     return {
-      content: [{ type: "text", text: result.error ?? "Validation failed." }],
-      isError: true,
+      content: [{ type: "text" as const, text: error }],
+      isError: true as const,
     };
   }
   return null;
@@ -85,7 +86,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.list_containers", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const { templateId, parameters } = adapter.listContainers();
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
@@ -112,7 +113,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.list", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, containerId, limit, offset, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const { templateId, parameters } = adapter.list({ containerId, limit, offset });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
@@ -137,7 +138,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.get", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, id, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const { templateId, parameters } = adapter.get(id);
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
@@ -164,7 +165,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.search", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, query, containerId, limit, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const { templateId, parameters } = adapter.search({ query, containerId, limit });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
@@ -190,7 +191,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.create", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, containerId, properties, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const validatedProperties = validateProperties(adapter, properties, "create");
         const { templateId, parameters } = adapter.create({ containerId, properties: validatedProperties });
@@ -218,7 +219,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.update", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, id, properties, confirmationToken, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const validatedProperties = validateProperties(adapter, properties, "update");
 
@@ -228,7 +229,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           confirmationToken
         );
         if (!confirmResult.confirmed) {
-          return { content: [{ type: "text", text: confirmResult.message }] };
+          return { content: [{ type: "text" as const, text: confirmResult.message }] };
         }
 
         const { templateId, parameters } = adapter.update({ id, properties: validatedProperties });
@@ -255,7 +256,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
         policy.assertAllowed({ toolName: "app.delete", bundleId: adapter.info.bundleId });
 
         const validationError = runValidation(adapter, { app, id, confirmationToken, dryRun }, validationContext);
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const confirmResult = await confirmation.requestConfirmation(
           "app.delete",
@@ -263,7 +264,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           confirmationToken
         );
         if (!confirmResult.confirmed) {
-          return { content: [{ type: "text", text: confirmResult.message }] };
+          return { content: [{ type: "text" as const, text: confirmResult.message }] };
         }
 
         const { templateId, parameters } = adapter.delete(id);
@@ -294,7 +295,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           { app, action, parameters: actionParams, dryRun },
           validationContext
         );
-        if (validationError) return validationError;
+        if (validationError) return validationError as { content: Array<{ type: "text"; text: string }>; isError: true };
 
         const { templateId, parameters } = adapter.action({ action, parameters: actionParams ?? {} });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
