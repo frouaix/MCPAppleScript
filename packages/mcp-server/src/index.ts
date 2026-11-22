@@ -2,47 +2,25 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config/config.js";
-import { PolicyEngine } from "./policy/policy.js";
 import { Logger } from "./util/logging.js";
 import { createServer } from "./server.js";
-
-function parseArgs() {
-  const args = process.argv.slice(2);
-  let http = false;
-  let port = 3333;
-  let host = "127.0.0.1";
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--http") {
-      http = true;
-    } else if (args[i] === "--port" && args[i + 1]) {
-      port = parseInt(args[i + 1]!, 10);
-      i++;
-    } else if (args[i] === "--host" && args[i + 1]) {
-      host = args[i + 1]!;
-      i++;
-    }
-  }
-
-  return { http, port, host };
-}
+import { parseArgs } from "./cli.js";
 
 async function main() {
-  const flags = parseArgs();
-
-  if (flags.http) {
-    const { startHttp } = await import("./http.js");
-    await startHttp({ port: flags.port, host: flags.host });
+  const flags = parseArgs(process.argv.slice(2));
+  if (flags.help) {
+    console.log(
+      "Usage: mcp-applescript [--profile NAME]\n\nStdio only. Permissions are fixed at startup.\nWithout --profile, uses the global permissions. Profiles can only narrow those grants."
+    );
     return;
   }
 
   const config = loadConfig();
   const logger = new Logger(config.logging);
-  const policy = new PolicyEngine(config, logger);
 
   logger.info("Starting MCP-AppleScript server");
 
-  const server = createServer({ config, policy, logger });
+  const server = createServer({ config, logger, profile: flags.profile });
   const transport = new StdioServerTransport();
 
   server.server.onerror = (err) => {

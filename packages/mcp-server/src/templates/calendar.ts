@@ -31,12 +31,12 @@ function buildListCalendars(bundleId: string): string {
   return `tell application id "${bundleId}"
     set calList to {}
     repeat with c in calendars
-        set end of calList to {calId:uid of c, calName:name of c, calColor:color of c}
+        set end of calList to {calName:name of c}
     end repeat
     set output to "["
     repeat with i from 1 to count of calList
         set c to item i of calList
-        set output to output & "{\\"id\\":\\"" & my jsonEsc(calId of c) & "\\",\\"name\\":\\"" & my jsonEsc(calName of c) & "\\",\\"type\\":\\"calendar\\"}"
+        set output to output & "{\\"id\\":\\"" & my jsonEsc(calName of c) & "\\",\\"name\\":\\"" & my jsonEsc(calName of c) & "\\",\\"type\\":\\"calendar\\"}"
         if i < (count of calList) then set output to output & ","
     end repeat
     set output to output & "]"
@@ -47,29 +47,63 @@ end tell`;
 function buildListEvents(bundleId: string, parameters: Record<string, unknown>): string {
   const calendarId = (parameters["calendarId"] as string | undefined) ?? "";
   const limit = (parameters["limit"] as number | undefined) ?? 50;
+  const offset = (parameters["offset"] as number | undefined) ?? 0;
+  const startDate = parameters["startDate"] as string | undefined;
+  const endDate = parameters["endDate"] as string | undefined;
+  const timeZone =
+    (parameters["timeZone"] as string | undefined) ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const calendarSelection = calendarId
+    ? `set selectedCalendars to (every calendar whose name is "${esc(calendarId)}")
+    if (count of selectedCalendars) is 0 then error "Calendar not found"
+    if (count of selectedCalendars) > 1 then error "Calendar name is ambiguous; omit calendarId to query all calendars"`
+    : "set selectedCalendars to calendars";
+  const range = startDate && endDate;
+  const eventQuery = range
+    ? "every event of c whose start date < rangeEnd and end date > rangeStart"
+    : "every event of c";
 
-  const targetClause = calendarId
-    ? `events of (first calendar whose uid is "${esc(calendarId)}")`
-    : "events of calendars";
-
-  return `tell application id "${bundleId}"
-    set allEvents to ${targetClause}
-    set totalCount to count of allEvents
-    set resultCount to totalCount
-    if resultCount > ${limit} then set resultCount to ${limit}
-    set output to "{\\"total\\":" & (totalCount as text) & ",\\"items\\":["
-    repeat with i from 1 to resultCount
-        set e to item i of allEvents
-        set eId to uid of e
-        set eSummary to summary of e
-        set eStart to start date of e as «class isot» as string
-        set eEnd to end date of e as «class isot» as string
-        set output to output & "{\\"id\\":\\"" & my jsonEsc(eId) & "\\",\\"name\\":\\"" & my jsonEsc(eSummary) & "\\",\\"type\\":\\"event\\",\\"properties\\":{\\"startDate\\":\\"" & my jsonEsc(eStart) & "\\",\\"endDate\\":\\"" & my jsonEsc(eEnd) & "\\"}}"
-        if i < resultCount then set output to output & ","
+  return `use framework "Foundation"
+use scripting additions
+set isoFormatter to current application's NSISO8601DateFormatter's alloc()'s init()
+${
+  range
+    ? `set rangeStart to (isoFormatter's dateFromString:"${esc(startDate)}") as date
+set rangeEnd to (isoFormatter's dateFromString:"${esc(endDate)}") as date`
+    : ""
+}
+set eventRows to current application's NSMutableArray's array()
+tell application id "${bundleId}"
+    ${calendarSelection}
+    repeat with c in selectedCalendars
+        set cName to name of c
+        set matchingEvents to ${eventQuery}
+        repeat with e in matchingEvents
+            set eventStart to start date of e
+            set eventEnd to end date of e
+            set startText to (isoFormatter's stringFromDate:eventStart) as text
+            set endText to (isoFormatter's stringFromDate:eventEnd) as text
+            set eventLocation to location of e
+            if eventLocation is missing value then set eventLocation to ""
+            set eventRecurrence to recurrence of e
+            if eventRecurrence is missing value then set eventRecurrence to ""
+            set rowData to current application's NSDictionary's dictionaryWithObjects:{uid of e, summary of e, cName, cName, startText, endText, eventLocation, allday event of e, eventRecurrence} forKeys:{"id", "name", "calendarId", "calendarName", "startDate", "endDate", "location", "allDay", "recurrence"}
+            eventRows's addObject:rowData
+        end repeat
     end repeat
-    set output to output & "]}"
-    return output
-end tell`;
+end tell
+eventRows's sortUsingDescriptors:{current application's NSSortDescriptor's sortDescriptorWithKey:"startDate" ascending:true, current application's NSSortDescriptor's sortDescriptorWithKey:"id" ascending:true}
+set totalCount to eventRows's |count|() as integer
+set pageStart to ${offset}
+if pageStart > totalCount then set pageStart to totalCount
+set pageCount to totalCount - pageStart
+if pageCount > ${limit} then set pageCount to ${limit}
+set pageRows to eventRows's subarrayWithRange:{pageStart, pageCount}
+set moreAvailable to (${offset} + pageCount < totalCount)
+set resultData to current application's NSDictionary's dictionaryWithObjects:{totalCount, ${offset}, moreAvailable, "${esc(timeZone)}", {"Recurring events are not expanded into occurrences; this result is not a complete recurring schedule."}, pageRows} forKeys:{"total", "offset", "hasMore", "timeZone", "limitations", "items"}
+set jsonData to current application's NSJSONSerialization's dataWithJSONObject:resultData options:0 |error|:(missing value)
+if jsonData is missing value then error "Could not serialize Calendar events"
+return (current application's NSString's alloc()'s initWithData:jsonData encoding:(current application's NSUTF8StringEncoding)) as text`;
 }
 
 function buildGetEvent(bundleId: string, parameters: Record<string, unknown>): string {

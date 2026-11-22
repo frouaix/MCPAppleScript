@@ -1,59 +1,47 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ConfirmationManager } from "../../src/mode/confirmation.js";
 
 describe("ConfirmationManager", () => {
-  let cm: ConfirmationManager;
-
-  beforeEach(() => {
-    cm = new ConfirmationManager();
-  });
-
-  it("issues a token on first call (no elicitation server)", async () => {
-    const result = await cm.requestConfirmation("test.action", "Test details");
+  it("fails closed without an elicitation-capable client and never issues tokens", async () => {
+    const manager = new ConfirmationManager();
+    const result = await manager.requestConfirmation("app.delete", "Delete note");
     assert.equal(result.confirmed, false);
-    if (!result.confirmed) {
-      assert.ok(result.token.length > 0);
-      assert.ok(result.message.includes("test.action"));
-      assert.ok(result.message.includes(result.token));
+    assert.match(result.message, /not executed/);
+    assert.equal("token" in result, false);
+  });
+
+  for (const action of ["accept", "decline", "cancel"] as const) {
+    for (const confirm of [true, false]) {
+      it(`handles ${action} with confirm=${confirm} without a fallback`, async () => {
+        const server = new Server({ name: "test", version: "1" });
+        mock.method(server, "getClientCapabilities", () => ({ elicitation: { form: {} } }));
+        const elicit = mock.method(server, "elicitInput", async () => ({
+          action,
+          content: { confirm },
+        }));
+        const manager = new ConfirmationManager();
+        manager.attachServer(server);
+        const result = await manager.requestConfirmation("app.update", '{"id":"123","body":"new"}');
+        assert.equal(result.confirmed, action === "accept" && confirm);
+        assert.equal(elicit.mock.callCount(), 1);
+        assert.match(elicit.mock.calls[0]?.arguments[0]?.message ?? "", /"body":"new"/);
+      });
     }
-  });
+  }
 
-  it("accepts a valid token on second call", async () => {
-    const first = await cm.requestConfirmation("test.action", "Test details");
-    assert.equal(first.confirmed, false);
-    if (first.confirmed) return;
-
-    const second = await cm.requestConfirmation("test.action", "Test details", first.token);
-    assert.equal(second.confirmed, true);
-  });
-
-  it("rejects a consumed token (single-use)", async () => {
-    const first = await cm.requestConfirmation("test.action", "details");
-    if (first.confirmed) return;
-
-    // Consume the token
-    const second = await cm.requestConfirmation("test.action", "details", first.token);
-    assert.equal(second.confirmed, true);
-
-    // Same token should now fail and issue a new one
-    const third = await cm.requestConfirmation("test.action", "details", first.token);
-    assert.equal(third.confirmed, false);
-  });
-
-  it("rejects a token for a different action", async () => {
-    const first = await cm.requestConfirmation("action.A", "details");
-    if (first.confirmed) return;
-
-    const second = await cm.requestConfirmation("action.B", "details", first.token);
-    assert.equal(second.confirmed, false);
-  });
-
-  it("rejects an invalid token", async () => {
-    const result = await cm.requestConfirmation("test.action", "details", "invalid-token");
-    assert.equal(result.confirmed, false);
-    if (!result.confirmed) {
-      assert.ok(result.token.length > 0);
-    }
+  it("does not turn elicitation failures into authorization", async () => {
+    const server = new Server({ name: "test", version: "1" });
+    mock.method(server, "getClientCapabilities", () => ({ elicitation: { form: {} } }));
+    mock.method(server, "elicitInput", async () => {
+      throw new Error("Client disconnected");
+    });
+    const manager = new ConfirmationManager();
+    manager.attachServer(server);
+    await assert.rejects(
+      manager.requestConfirmation("app.delete", "Delete"),
+      /Client disconnected/
+    );
   });
 });

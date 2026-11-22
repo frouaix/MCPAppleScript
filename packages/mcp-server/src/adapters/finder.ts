@@ -1,48 +1,71 @@
 import {
-  ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams,
-  UnsupportedOperationError, ValidationContext, ValidationResult,
+  ResourceAdapter,
+  AppInfo,
+  ListParams,
+  SearchParams,
+  CreateParams,
+  UpdateParams,
+  ActionParams,
+  UnsupportedOperationError,
+  ValidationContext,
+  ValidationResult,
 } from "./types.js";
 import { z } from "zod";
 import { homedir } from "node:os";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname, basename, relative, isAbsolute, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { McpAppleScriptError } from "../util/errors.js";
 
 /**
  * Finder adapter. Uses POSIX paths as IDs.
  * Containers are folders, items are files/folders within them.
  */
-const finderPropertiesSchema = z.object({
-  name: z.string().optional(),
-  parentPath: z.string().optional(),
-  destPath: z.string().optional(),
-}).passthrough();
+const finderPropertiesSchema = z
+  .object({
+    name: z.string().optional(),
+    parentPath: z.string().optional(),
+    destPath: z.string().optional(),
+  })
+  .passthrough();
 
 /**
- * Normalize a path for allowlist comparison:
- * - Resolve ~ to home directory
- * - Resolve relative paths
- * - Normalize trailing slashes
+ * Resolve existing ancestors too, so nonexistent children cannot bypass the allowlist via a symlink.
  */
 function normalizePath(raw: string): string {
-  let p = raw.trim();
-
-  // Resolve ~ to home directory
-  if (p.startsWith("~")) {
-    const relative = p.slice(1);
-    p = join(homedir(), relative);
+  if (!raw || (raw.startsWith("~") && raw !== "~" && !raw.startsWith("~/"))) {
+    throw new McpAppleScriptError("INVALID_REQUEST", "Expected a non-empty path or ~/ path.");
   }
-
-  // Resolve relative paths
-  if (!p.startsWith("/")) {
-    p = resolve(process.cwd(), p);
+  let path = resolve(
+    raw === "~" ? homedir() : raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw
+  );
+  const suffix: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(path), ...suffix);
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+      const parent = dirname(path);
+      if (parent === path) throw error;
+      suffix.unshift(basename(path));
+      path = parent;
+    }
   }
+}
 
-  // Normalize trailing slashes (except for root)
-  if (p !== "/") {
-    p = p.replace(/\/+$/, "");
+function normalizeActionPaths(parameters: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...parameters };
+  for (const key of ["path", "sourcePath", "destPath"]) {
+    const value = parameters[key];
+    if (value !== undefined) {
+      if (typeof value !== "string") {
+        throw new McpAppleScriptError("INVALID_REQUEST", `${key} must be a path string.`);
+      }
+      normalized[key] = normalizePath(value);
+    }
   }
-
-  return p;
+  return normalized;
 }
 
 export class FinderAdapter implements ResourceAdapter {
@@ -51,8 +74,13 @@ export class FinderAdapter implements ResourceAdapter {
     displayName: "Finder",
     bundleId: "com.apple.finder",
     capabilities: {
-      listContainers: true, list: true, get: true, search: true,
-      create: true, update: true, delete: true,
+      listContainers: true,
+      list: true,
+      get: true,
+      search: true,
+      create: true,
+      update: true,
+      delete: true,
       actions: ["show", "reveal", "move", "duplicate"],
     },
     itemType: "file",
@@ -62,14 +90,14 @@ export class FinderAdapter implements ResourceAdapter {
   };
 
   listContainers() {
-    return { templateId: "finder.list_folders", parameters: { path: "~" } };
+    return { templateId: "finder.list_folders", parameters: { path: normalizePath("~") } };
   }
 
   list(params: ListParams) {
     return {
       templateId: "finder.list_items",
       parameters: {
-        path: params.containerId ?? "~",
+        path: normalizePath(params.containerId ?? "~"),
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       },
@@ -77,7 +105,7 @@ export class FinderAdapter implements ResourceAdapter {
   }
 
   get(id: string) {
-    return { templateId: "finder.get_item", parameters: { path: id } };
+    return { templateId: "finder.get_item", parameters: { path: normalizePath(id) } };
   }
 
   search(params: SearchParams) {
@@ -85,7 +113,7 @@ export class FinderAdapter implements ResourceAdapter {
       templateId: "finder.search_items",
       parameters: {
         query: params.query,
-        path: params.containerId ?? "~",
+        path: normalizePath(params.containerId ?? "~"),
         limit: params.limit ?? 20,
       },
     };
@@ -96,7 +124,7 @@ export class FinderAdapter implements ResourceAdapter {
       templateId: "finder.create_folder",
       parameters: {
         name: params.properties.name ?? "",
-        parentPath: params.containerId ?? "~",
+        parentPath: normalizePath(params.containerId ?? "~"),
       },
     };
   }
@@ -106,52 +134,56 @@ export class FinderAdapter implements ResourceAdapter {
     return {
       templateId: "finder.move_item",
       parameters: {
-        sourcePath: params.id,
-        destPath: (params.properties.destPath as string) ?? "",
+        sourcePath: normalizePath(params.id),
+        destPath: normalizePath((params.properties.destPath as string) ?? ""),
       },
     };
   }
 
   delete(id: string) {
-    return { templateId: "finder.delete_item", parameters: { path: id } };
+    return { templateId: "finder.delete_item", parameters: { path: normalizePath(id) } };
   }
 
   action(params: ActionParams) {
     switch (params.action) {
       case "show":
-        return { templateId: "finder.show", parameters: params.parameters };
+        return { templateId: "finder.show", parameters: normalizeActionPaths(params.parameters) };
       case "reveal":
-        return { templateId: "finder.reveal", parameters: params.parameters };
+        return { templateId: "finder.reveal", parameters: normalizeActionPaths(params.parameters) };
       case "move":
-        return { templateId: "finder.move_item", parameters: params.parameters };
+        return {
+          templateId: "finder.move_item",
+          parameters: normalizeActionPaths(params.parameters),
+        };
       case "duplicate":
-        return { templateId: "finder.duplicate_item", parameters: params.parameters };
+        return {
+          templateId: "finder.duplicate_item",
+          parameters: normalizeActionPaths(params.parameters),
+        };
       default:
         throw new UnsupportedOperationError("finder", params.action);
     }
   }
 
-  validateParams(
-    params: Record<string, unknown>,
-    context: ValidationContext
-  ): ValidationResult {
+  validateParams(params: Record<string, unknown>, context: ValidationContext): ValidationResult {
     const { allowedPaths } = context.finderConfig;
 
     // Empty allowlist = deny all
     if (allowedPaths.length === 0) {
       return {
         valid: false,
-        error: 'Finder access denied: no paths configured. Set "finder.allowedPaths" in config to enable Finder access (e.g. ["~/Documents", "~/Desktop"]).',
+        error:
+          'Finder access denied: no paths configured. Set "finder.allowedPaths" in config to enable Finder access (e.g. ["~/Documents", "~/Desktop"]).',
       };
     }
 
-    const pathsToCheck: string[] = [];
+    const pathsToCheck: unknown[] = [];
 
     // containerId is used as path for list/search/create (defaults to "~")
     const containerId = params["containerId"] as string | undefined;
     if (containerId) {
       pathsToCheck.push(containerId);
-    } else if (params["containerId"] !== undefined || this._hasListContainersParam(params)) {
+    } else if ("containerId" in params) {
       pathsToCheck.push("~");
     }
 
@@ -181,10 +213,17 @@ export class FinderAdapter implements ResourceAdapter {
 
     // Validate each path against the allowlist
     for (const path of pathsToCheck) {
+      if (typeof path !== "string") {
+        return { valid: false, error: "Finder paths must be strings." };
+      }
       const normalized = normalizePath(path);
       const isAllowed = allowedPaths.some((allowed) => {
         const normalizedAllowed = normalizePath(allowed);
-        return normalized === normalizedAllowed || normalized.startsWith(normalizedAllowed + "/");
+        const remainder = relative(normalizedAllowed, normalized);
+        return (
+          remainder === "" ||
+          (remainder !== ".." && !remainder.startsWith(`..${sep}`) && !isAbsolute(remainder))
+        );
       });
       if (!isAllowed) {
         return {
@@ -195,13 +234,5 @@ export class FinderAdapter implements ResourceAdapter {
     }
 
     return { valid: true };
-  }
-
-  // Track whether we've seen a containerId param to distinguish
-  // between "not provided" and "provided but empty"
-  private _hasListContainersParam(params: Record<string, unknown>): boolean {
-    // list_containers handler passes { app, dryRun } only
-    // We detect this by checking if containerId was explicitly passed
-    return "containerId" in params;
   }
 }

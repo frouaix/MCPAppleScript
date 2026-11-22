@@ -5,8 +5,8 @@
 ```bash
 pnpm install                    # Install all dependencies
 pnpm build                      # Build TypeScript
-pnpm test:unit                  # ~150 TypeScript unit tests
-pnpm test:integration           # Integration tests (requires macOS + TCC permissions)
+pnpm test:unit                  # TypeScript unit tests
+pnpm test:integration           # Stdio protocol tests; real-app reads require APPLESCRIPT_E2E=1
 pnpm lint                       # ESLint
 pnpm format                     # Prettier
 
@@ -28,9 +28,9 @@ MCP Client → TypeScript MCP Server → osascript → macOS Apps (via Apple Eve
                 adapters, templates)
 ```
 
-**Transports**: stdio (default) or Streamable HTTP (`--http` flag).
+**Transport**: stdio only. Select an immutable permission profile with `--profile NAME`.
 
-**Data flow for a tool call**: MCP request → Zod validation → policy check → mode gate → `ResourceAdapter` maps to `{templateId, parameters}` → TypeScript template builder generates AppleScript → executed via `osascript` → JSON result returned.
+**Data flow for a tool call**: MCP request → Zod validation → per-app permission check → adapter validation → `ResourceAdapter` maps to `{templateId, parameters}` → user confirmation when required → TypeScript template builder generates AppleScript → executed via `osascript` → JSON result returned.
 
 ### ResourceAdapter Pattern
 
@@ -40,15 +40,19 @@ The adapter maps generic CRUD operations (`list`, `get`, `search`, `create`, `up
 
 Apps that don't support an operation throw `UnsupportedOperationError`.
 
-### Three Operation Modes
+### Immutable Per-App Permissions
 
-Modes are cumulative and configurable via `config.modes`. Tool-to-mode mapping can be overridden to promote/restrict tools.
+`config.permissions` is the global ceiling. `config.profiles[NAME]` can only narrow it.
+Each has `default` (defaults to `off`) and `apps` keyed by short app names, not bundle IDs.
 
-- **readonly** (default): `ping`, `get_mode`, `set_mode`, `app.list_containers`, `app.list`, `app.get`, `app.search`
-- **create**: + `app.create`, `app.action`, `applescript.run_template`
-- **full**: + `app.update`, `app.delete`, `applescript.run_script` (all require user confirmation via MCP elicitation or confirmation token)
+- **off**: no app access (default)
+- **read**: list containers, list, get, search, Music `now_playing`
+- **readwrite**: read plus supported writes/actions; update/delete/send/move/JavaScript require form elicitation
 
-Mode changes use `RegisteredTool.enable()/disable()` and emit `notifications/tools/list_changed`.
+Tools and app enums reflect effective grants; every call is authorized, including dry runs. No MCP tool changes
+permissions or executes arbitrary templates/scripts. `applescript.get_permissions`
+reports the selected profile and effective grants. Missing elicitation support blocks
+consequential writes; declined confirmation never falls back to model-visible tokens.
 
 ## Executor
 

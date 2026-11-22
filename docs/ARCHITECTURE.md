@@ -1,122 +1,71 @@
 # Architecture
 
-## Overview
+MCP-AppleScript is a local stdio MCP server. A TypeScript process executes parameterized
+AppleScript through `child_process.execFile("osascript", ["-e", script])` without a shell.
+There is no HTTP transport or Swift helper.
 
-MCP-AppleScript is a local Model Context Protocol (MCP) server that exposes controlled AppleScript automation tools to MCP clients on macOS. It bridges the [Model Context Protocol](https://modelcontextprotocol.io/) to macOS applications via AppleScript.
-
-**Two components:**
-- **MCP Server** (TypeScript/Node.js): Handles MCP protocol, tool schemas, configuration, validation, logging, and policy enforcement.
-- **osascript executor**: Runs AppleScript commands via `child_process.execFile` (no shell) and returns structured JSON results.
-
-> **Warning:** This software can read, create, modify, and delete personal data across 10 Apple apps. Users are solely responsible for configuration and safety.
-
-## High-level process
-
-```
-MCP tool call → Node validates & enforces policy & mode →
-  template builds AppleScript → osascript executes →
-  JSON result returned → Node maps to MCP result
-```
-
-### Process
-
-**MCP Server** (Node/TS)
-- Speaks MCP over **stdio** (default) or **Streamable HTTP** (`--http` flag).
-- Registers tools (`tools/list`, `tools/call`) with JSON Schemas via Zod.
-- Loads config from `~/.config/applescript-mcp/config.json` or `APPLESCRIPT_MCP_CONFIG` env var.
-- Validates tool inputs against Zod schemas.
-- Translates tool calls to template ID + parameters via **ResourceAdapter** pattern.
-- Builds AppleScript source from TypeScript templates with compile-time escaping.
-- Executes via `osascript -e <script>` using `execFile` (no shell).
-- Returns structured results and errors.
-
-### Data flow
-
-```
-MCP tool call
-  → Zod validates parameters
-  → PolicyEngine checks allowlists / mode / runScript config
-  → ModeManager checks operation mode (readonly/create/full)
-  → ConfirmationManager checks destructive-action confirmation
-  → ResourceAdapter maps → {templateId, parameters}
-  → Template builder generates AppleScript (with esc() escaping)
-  → wrapScript() appends runtime JSON handlers
-  → osascript executes
-  → JSON result parsed → MCP result returned
+```text
+Trusted host selects --profile NAME
+  -> config schema validates global ceiling and named profile
+  -> PolicyEngine snapshots effective app grants
+  -> stdio MCP connection
+  -> Zod tool input validation
+  -> per-call permission check
+  -> adapter validation (Finder paths / Safari JavaScript)
+  -> ResourceAdapter maps to an internal template
+  -> user confirmation when required
+  -> template builds AppleScript and appends JSON handlers
+  -> osascript -> Apple Events -> macOS app
+  -> JSON result or error returned
 ```
 
-## Module layout
+## Permission boundary
 
-```
-packages/mcp-server/src/
-  index.ts              # CLI entrypoint (stdio + HTTP)
-  server.ts             # MCP server setup + tool registration
-  http.ts               # Streamable HTTP transport (Express)
-  tools/                # Tool registration modules
-    system-tools.ts     # applescript.ping, get_mode, set_mode
-    crud-tools.ts       # app.list_containers, list, get, search, create, update, delete, action
-    script-tools.ts     # applescript.run_template, applescript.run_script
-  adapters/             # per-app resource adapters
-    types.ts            # ResourceAdapter interface, ValidationContext, ValidationResult
-    registry.ts         # AppRegistry lookup
-    notes.ts, calendar.ts, reminders.ts, mail.ts,
-    contacts.ts, messages.ts, photos.ts, music.ts,
-    finder.ts, safari.ts
-  templates/            # AppleScript template builders
-    index.ts            # dispatcher (routes by prefix)
-    escape.ts           # esc(), wrapScript(), jsonEscHandlers
-    notes.ts, calendar.ts, ...
-  exec/
-    executor.ts         # osascript execution via execFile
-    types.ts            # ExecutorRequest/Response interfaces
-  policy/
-    policy.ts           # allowlists/denylists + enforcement
-  config/
-    config.ts           # load/merge config (file/env)
-    schema.ts           # zod schemas (AppConfig, FinderConfig, SafariConfig, etc.)
-  mode/
-    mode.ts             # operation mode management (readonly/create/full)
-    confirmation.ts     # confirmation tokens + elicitation
-  util/
-    errors.ts           # McpAppleScriptError + typed error codes
-    json.ts             # JSON utilities
-    logging.ts          # Logger with field redaction
-test/
-  unit/                 # unit tests (all frameworks)
-  integration/          # macOS-only e2e tests
-```
+The global `permissions` and each named profile have a `default` permission and
+per-app `apps` overrides. Defaults are `off`; app names are validated against the
+supported-app enum. For each app, the selected profile's grant is intersected with
+the global ceiling using `off < read < readwrite`.
 
-## Key patterns
+Without a profile, global grants are used. Unknown profiles fail startup. Grants are
+frozen at startup and cannot be changed through MCP; config changes require restart.
+Separate instances keep separate grants, with no shared mutable policy.
 
-### ResourceAdapter
+The host must restrict which instance a conversation can use. Profiles do not sandbox
+an agent with unrestricted shell access as the same macOS user. macOS TCC/Automation
+consent is a separate enforcement layer, not a read/write permission system.
 
-Each app implements `ResourceAdapter`, mapping generic CRUD operations to app-specific template IDs and parameters. Apps that support only a subset of operations throw `UnsupportedOperationError`.
+Tool visibility and generic app enums reflect effective grants; every call is still
+checked. Calendar and Notes expose task-specific read tools alongside generic reads.
+Initialization instructions describe workflows and limitations for enabled apps.
+Music `now_playing` is the
+only read-only app action; other actions require `readwrite`. Updates, deletions, and
+send/move/JavaScript actions require explicit user confirmation via MCP form elicitation.
+There is no confirmation-token fallback or arbitrary script/template dispatch tool.
 
-```typescript
-interface ResourceAdapter {
-  listContainers(): { templateId: string; parameters: Record<string, unknown> };
-  list(params: ListParams): { templateId: string; parameters: Record<string, unknown> };
-  // ...
-  validateParams?(params, context): ValidationResult;
-}
-```
+Finder validation resolves paths and existing symlinks against a separate allowlist;
+execution uses resolved paths as well. This is not a filesystem sandbox or protection
+against concurrent filesystem changes by other local processes.
 
-### Validation
+## Modules
 
-Adapters declare which MCP parameters require validation via `requiredValidation`. The `validateParams()` method returns `{ valid, error? }`. This is used by:
-- **Finder**: path allowlist enforcement (`finder.allowedPaths`)
-- **Safari**: `do_javascript` gating (`safari.doJavaScript`)
-- Other adapters: no validation needed (`requiredValidation: []`)
+| Path under `packages/mcp-server/src/` | Responsibility |
+|---|---|
+| `index.ts`, `cli.ts` | Stdio startup and strict profile argument parsing |
+| `server.ts` | Adapter registry, fixed policy, tool wiring, execution |
+| `config/` | File/env path loading, strict schema, legacy config errors |
+| `policy/policy.ts` | Effective permission snapshot and per-call authorization |
+| `tools/system-tools.ts` | Health and permission inspection |
+| `tools/crud-tools.ts` | Generic app operations, validation, confirmation |
+| `tools/app-read-tools.ts` | Discoverable Calendar/Notes reads and local-day range resolution |
+| `mode/confirmation.ts` | User confirmation via form elicitation only |
+| `adapters/` | ResourceAdapter implementations and app-specific validation |
+| `templates/` | Internal parameterized AppleScript builders and escaping |
+| `exec/` | osascript invocation, timeout and error classification |
+| `util/` | Typed errors, JSON utilities, stderr logging |
 
-### Operation modes
+`ResourceAdapter` maps generic operations to `{ templateId, parameters }`.
+Unsupported operations throw `UnsupportedOperationError`. The template dispatcher
+selects a per-app builder by prefix. Templates are not directly exposed to clients.
 
-Three cumulative modes control tool availability:
-- **readonly** — read-only tools only (default)
-- **create** — + create, action, run_template
-- **full** — + update, delete, run_script (all require confirmation)
-
-### Confirmation
-
-Destructive actions (update, delete, run_script, run_template) require confirmation via:
-1. **MCP elicitation** — server asks client to show a dialog
-2. **Confirmation tokens** — fallback: issue a token the user must pass back on retry (2-minute TTL)
+See [tools](TOOLS.md), [internal executor contracts](CONTRACTS.md), and
+[testing](TESTING.md).

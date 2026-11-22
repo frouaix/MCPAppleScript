@@ -43,15 +43,14 @@ applescript-mcp/
       .prettierrc
 
       src/
-        index.ts              # CLI entrypoint (stdio default, --http flag)
+        index.ts              # Stdio entrypoint
+        cli.ts                # Strict --profile argument parsing
         server.ts             # MCP server setup + tool registration
-        http.ts               # Streamable HTTP transport (Express)
 
         tools/                # Tool registration modules
           index.ts
-          system-tools.ts     # applescript.ping, get_mode, set_mode
+          system-tools.ts     # applescript.ping, get_permissions
           crud-tools.ts       # CRUD tool registrations
-          script-tools.ts     # run_template, run_script
 
         adapters/             # per-app resource adapters
           types.ts            # ResourceAdapter, ValidationContext, ValidationResult
@@ -86,15 +85,14 @@ applescript-mcp/
           types.ts            # ExecutorRequest/Response interfaces
 
         policy/
-          policy.ts           # allowlists/denylists + enforcement
+          policy.ts           # Immutable app grants and profile intersection
 
         config/
           config.ts           # load/merge config (file/env)
-          schema.ts           # zod schemas (AppConfig, FinderConfig, SafariConfig, etc.)
+          schema.ts           # Zod app names, permissions, profiles, config
 
         mode/
-          mode.ts             # operation mode management (readonly/create/full)
-          confirmation.ts     # confirmation tokens + elicitation
+          confirmation.ts     # User confirmation via form elicitation
 
         util/
           errors.ts           # McpAppleScriptError + typed error codes
@@ -102,20 +100,21 @@ applescript-mcp/
           logging.ts          # Logger with field redaction
 
       test/
-        unit/                 # unit tests (policy, config, executor, adapters, mode,
+        unit/                 # unit tests (policy, config, executor, adapters, CLI,
           adapters.test.ts    #   confirmation, errors, json, logging, server,
+          cli.test.ts
           config-loading.test.ts  #   validation)
           config-schema.test.ts
           confirmation.test.ts
+          crud-tools.test.ts   # Protocol confirmation flow without app execution
           errors.test.ts
           executor.test.ts
           json.test.ts
           logging.test.ts
-          mode.test.ts
           policy.test.ts
           server.test.ts
           validation.test.ts
-        integration/          # macOS-only e2e tests
+        integration/          # Stdio protocol tests and opt-in real-app reads
           e2e-apps.test.ts
           server.test.ts
 

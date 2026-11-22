@@ -1,17 +1,25 @@
 import {
-  ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  ResourceAdapter,
+  AppInfo,
+  ListParams,
+  SearchParams,
+  CreateParams,
+  UpdateParams,
+  ActionParams,
+  UnsupportedOperationError,
 } from "./types.js";
 import { z } from "zod";
 
-const calendarPropertiesSchema = z.object({
-  title: z.string().optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  location: z.string().optional(),
-  notes: z.string().optional(),
-  allDay: z.boolean().optional(),
-}).passthrough();
+const calendarPropertiesSchema = z
+  .object({
+    title: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    location: z.string().optional(),
+    notes: z.string().optional(),
+    allDay: z.boolean().optional(),
+  })
+  .passthrough();
 
 export class CalendarAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -19,8 +27,14 @@ export class CalendarAdapter implements ResourceAdapter {
     displayName: "Apple Calendar",
     bundleId: "com.apple.iCal",
     capabilities: {
-      listContainers: true, list: true, get: true, search: true,
-      create: true, update: true, delete: true, actions: ["show"],
+      listContainers: true,
+      list: true,
+      get: true,
+      search: true,
+      create: true,
+      update: true,
+      delete: true,
+      actions: ["show"],
     },
     itemType: "event",
     containerType: "calendar",
@@ -39,6 +53,9 @@ export class CalendarAdapter implements ResourceAdapter {
         calendarId: params.containerId ?? "",
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        timeZone: params.timeZone,
       },
     };
   }

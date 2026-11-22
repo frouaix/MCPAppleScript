@@ -87,6 +87,10 @@ export interface ListParams {
   containerId?: string;
   limit?: number;
   offset?: number;
+  /** Calendar event overlap interval (ISO 8601 instants). */
+  startDate?: string;
+  endDate?: string;
+  timeZone?: string;
 }
 
 /** Parameters for the search operation. */

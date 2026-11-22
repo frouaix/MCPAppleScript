@@ -2,6 +2,10 @@
 
 ## Executor Request/Response
 
+These are internal TypeScript contracts, not MCP tools or an IPC service.
+Raw execution is used only by internal executor tests; clients cannot submit raw
+scripts, template IDs, or bundle IDs directly.
+
 ### ExecutorRequest
 
 ```json

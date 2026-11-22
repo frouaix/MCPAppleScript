@@ -1,120 +1,66 @@
-import { Config, AppConfig } from "../config/schema.js";
-import { PolicyDeniedError } from "../util/errors.js";
+import { AppName, AppNameSchema, Config, Permission } from "../config/schema.js";
+import { ConfigError, PolicyDeniedError } from "../util/errors.js";
 import { Logger } from "../util/logging.js";
-import { ModeManager } from "../mode/mode.js";
+
+const LEVEL: Record<Permission, number> = { off: 0, read: 1, readwrite: 2 };
+const READ_TOOLS = new Set(["app.list_containers", "app.list", "app.get", "app.search"]);
+const WRITE_TOOLS = new Set(["app.create", "app.update", "app.delete", "app.action"]);
 
 export interface PolicyContext {
   toolName: string;
-  bundleId?: string;
-  args?: Record<string, unknown>;
+  app: AppName;
+  action?: string;
 }
 
 export class PolicyEngine {
-  private readonly config: Config;
-  private readonly logger: Logger;
-  private modeManager: ModeManager | undefined;
+  private readonly permissions: Readonly<Record<AppName, Permission>>;
 
-  constructor(config: Config, logger: Logger) {
-    this.config = config;
-    this.logger = logger;
-  }
-
-  /** Attach a ModeManager for mode-based enforcement. */
-  setModeManager(modeManager: ModeManager): void {
-    this.modeManager = modeManager;
-  }
-
-  assertAllowed(ctx: PolicyContext): void {
-    const { toolName, bundleId } = ctx;
-
-    // Mode check: reject tools not allowed in current mode
-    if (this.modeManager) {
-      const mode = this.modeManager.getMode();
-      if (!this.modeManager.isToolAllowedInMode(toolName, mode)) {
-        this.logger.warn("Policy denied: tool not allowed in current mode", {
-          toolName,
-          mode,
-        });
-        throw new PolicyDeniedError(
-          `Tool ${toolName} is not available in "${mode}" mode. Change mode with applescript.set_mode.`,
-          { toolName, mode }
-        );
-      }
+  constructor(
+    config: Config,
+    private readonly logger: Logger,
+    readonly profile?: string
+  ) {
+    const grant =
+      profile === undefined
+        ? config.permissions
+        : Object.hasOwn(config.profiles, profile)
+          ? config.profiles[profile]
+          : undefined;
+    if (!grant) {
+      throw new ConfigError(`Unknown permission profile "${profile}". Configure it in "profiles".`);
     }
 
-    // run_script requires explicit enablement
-    if (toolName === "applescript.run_script") {
-      this.assertRunScriptAllowed(bundleId);
-      return;
-    }
-
-    // Tools without a bundleId (e.g. applescript.list_apps, applescript.ping) are always allowed
-    if (!bundleId) return;
-
-    this.assertAppAllowed(bundleId, toolName);
+    this.permissions = Object.freeze(
+      Object.fromEntries(
+        AppNameSchema.options.map((app) => {
+          const ceiling = config.permissions.apps[app] ?? config.permissions.default;
+          const requested = grant.apps[app] ?? grant.default;
+          const effective = LEVEL[requested] <= LEVEL[ceiling] ? requested : ceiling;
+          return [app, effective];
+        })
+      ) as Record<AppName, Permission>
+    );
   }
 
-  isAppEnabled(bundleId: string): boolean {
-    const appConfig = this.config.apps[bundleId];
-    return appConfig?.enabled === true;
+  getPermissions(): Readonly<Record<AppName, Permission>> {
+    return this.permissions;
   }
 
-  getAllowedTools(bundleId: string): string[] {
-    const appConfig = this.config.apps[bundleId];
-    return appConfig?.allowedTools ?? [];
-  }
-
-  getConfiguredApps(): Array<{ bundleId: string; config: AppConfig }> {
-    return Object.entries(this.config.apps).map(([bundleId, config]) => ({
-      bundleId,
-      config,
-    }));
-  }
-
-  private assertRunScriptAllowed(bundleId?: string): void {
-    if (!this.config.runScript.enabled) {
-      this.logger.warn("run_script denied: globally disabled");
+  assertAllowed({ toolName, app, action }: PolicyContext): void {
+    // Unknown operations fail closed; new action types are writes unless explicitly classified.
+    const required =
+      READ_TOOLS.has(toolName) ||
+      (toolName === "app.action" && app === "music" && action === "now_playing")
+        ? "read"
+        : WRITE_TOOLS.has(toolName)
+          ? "readwrite"
+          : undefined;
+    const permission = this.permissions[app];
+    if (!required || LEVEL[permission] < LEVEL[required]) {
+      this.logger.warn("Policy denied", { toolName, app, action, permission, required });
       throw new PolicyDeniedError(
-        "applescript.run_script is disabled. Enable it in config to use.",
-        { toolName: "applescript.run_script" }
-      );
-    }
-
-    if (bundleId && this.config.runScript.allowedBundleIds.length > 0) {
-      if (!this.config.runScript.allowedBundleIds.includes(bundleId)) {
-        this.logger.warn("run_script denied: bundle not in allowlist", { bundleId });
-        throw new PolicyDeniedError(
-          `applescript.run_script is not allowed for app ${bundleId}`,
-          { toolName: "applescript.run_script", bundleId }
-        );
-      }
-    }
-  }
-
-  private assertAppAllowed(bundleId: string, toolName: string): void {
-    const appConfig = this.config.apps[bundleId];
-
-    if (!appConfig) {
-      this.logger.warn("Policy denied: app not configured", { bundleId, toolName });
-      throw new PolicyDeniedError(
-        `App ${bundleId} is not configured. Add it to config to use.`,
-        { toolName, bundleId }
-      );
-    }
-
-    if (!appConfig.enabled) {
-      this.logger.warn("Policy denied: app disabled", { bundleId, toolName });
-      throw new PolicyDeniedError(`App ${bundleId} is disabled in config.`, {
-        toolName,
-        bundleId,
-      });
-    }
-
-    if (appConfig.allowedTools.length > 0 && !appConfig.allowedTools.includes(toolName)) {
-      this.logger.warn("Policy denied: tool not in allowlist", { bundleId, toolName });
-      throw new PolicyDeniedError(
-        `Tool ${toolName} is not allowed for app ${bundleId}`,
-        { toolName, bundleId, allowedTools: appConfig.allowedTools }
+        `${toolName}${action ? ` (${action})` : ""} requires ${required ?? "a supported operation"} access to ${app}; this instance has ${permission} access.`,
+        { toolName, app, permission, profile: this.profile ?? null }
       );
     }
   }

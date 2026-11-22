@@ -228,24 +228,15 @@ describe("MessagesAdapter", () => {
   });
 
   it("create throws UnsupportedOperationError", () => {
-    assert.throws(
-      () => adapter.create({ properties: {} }),
-      UnsupportedOperationError
-    );
+    assert.throws(() => adapter.create({ properties: {} }), UnsupportedOperationError);
   });
 
   it("update throws UnsupportedOperationError", () => {
-    assert.throws(
-      () => adapter.update({ id: "x", properties: {} }),
-      UnsupportedOperationError
-    );
+    assert.throws(() => adapter.update({ id: "x", properties: {} }), UnsupportedOperationError);
   });
 
   it("delete throws UnsupportedOperationError", () => {
-    assert.throws(
-      () => adapter.delete("x"),
-      UnsupportedOperationError
-    );
+    assert.throws(() => adapter.delete("x"), UnsupportedOperationError);
   });
 
   it("action send works", () => {
@@ -275,10 +266,7 @@ describe("PhotosAdapter", () => {
   });
 
   it("update throws UnsupportedOperationError", () => {
-    assert.throws(
-      () => adapter.update({ id: "x", properties: {} }),
-      UnsupportedOperationError
-    );
+    assert.throws(() => adapter.update({ id: "x", properties: {} }), UnsupportedOperationError);
   });
 
   it("action import works", () => {
@@ -338,7 +326,8 @@ describe("FinderAdapter", () => {
   it("list defaults to home directory", () => {
     const result = adapter.list({});
     assert.equal(result.templateId, "finder.list_items");
-    assert.equal(result.parameters.path, "~");
+    assert.equal(typeof result.parameters.path, "string");
+    assert.ok(String(result.parameters.path).startsWith("/"));
   });
 
   it("get uses path as id", () => {
@@ -348,16 +337,16 @@ describe("FinderAdapter", () => {
   });
 
   it("create returns create_folder template", () => {
-    const result = adapter.create({ containerId: "/tmp", properties: { name: "test" } });
+    const result = adapter.create({ containerId: "/Users/test", properties: { name: "test" } });
     assert.equal(result.templateId, "finder.create_folder");
-    assert.equal(result.parameters.parentPath, "/tmp");
+    assert.equal(result.parameters.parentPath, "/Users/test");
     assert.equal(result.parameters.name, "test");
   });
 
   it("delete uses path as id", () => {
-    const result = adapter.delete("/tmp/old");
+    const result = adapter.delete("/Users/test/old");
     assert.equal(result.templateId, "finder.delete_item");
-    assert.equal(result.parameters.path, "/tmp/old");
+    assert.equal(result.parameters.path, "/Users/test/old");
   });
 
   it("action reveal works", () => {
@@ -407,10 +396,7 @@ describe("SafariAdapter", () => {
   });
 
   it("update throws UnsupportedOperationError", () => {
-    assert.throws(
-      () => adapter.update({ id: "1", properties: {} }),
-      UnsupportedOperationError
-    );
+    assert.throws(() => adapter.update({ id: "1", properties: {} }), UnsupportedOperationError);
   });
 
   it("delete returns close_tab template", () => {
@@ -420,12 +406,18 @@ describe("SafariAdapter", () => {
   });
 
   it("action do_javascript works", () => {
-    const result = adapter.action({ action: "do_javascript", parameters: { script: "document.title" } });
+    const result = adapter.action({
+      action: "do_javascript",
+      parameters: { script: "document.title" },
+    });
     assert.equal(result.templateId, "safari.do_javascript");
   });
 
   it("action add_reading_list works", () => {
-    const result = adapter.action({ action: "add_reading_list", parameters: { url: "https://x.com" } });
+    const result = adapter.action({
+      action: "add_reading_list",
+      parameters: { url: "https://x.com" },
+    });
     assert.equal(result.templateId, "safari.add_reading_list");
   });
 

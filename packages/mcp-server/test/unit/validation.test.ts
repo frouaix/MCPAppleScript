@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync, realpathSync } from "node:fs";
 import { FinderAdapter } from "../../src/adapters/finder.js";
 import { SafariAdapter } from "../../src/adapters/safari.js";
 import { ValidationContext } from "../../src/adapters/index.js";
@@ -185,10 +187,7 @@ describe("FinderAdapter.validateParams", () => {
   });
 
   it("handles empty id string (skips validation for missing id)", () => {
-    const result = adapter.validateParams(
-      { id: "" },
-      makeContext(["/Users/test/Documents"])
-    );
+    const result = adapter.validateParams({ id: "" }, makeContext(["/Users/test/Documents"]));
     assert.equal(result.valid, true);
   });
 
@@ -200,6 +199,61 @@ describe("FinderAdapter.validateParams", () => {
     assert.equal(result.valid, false);
     assert.ok(result.error?.includes("/Users/test/Documents"));
     assert.ok(result.error?.includes("/Users/test/Desktop"));
+  });
+
+  it("denies absolute traversal out of an allowed folder", () => {
+    assert.equal(
+      adapter.validateParams(
+        { id: "/Users/test/Documents/../Secrets/file" },
+        makeContext(["/Users/test/Documents"])
+      ).valid,
+      false
+    );
+  });
+
+  it("allows explicit root grants", () => {
+    assert.equal(adapter.validateParams({ id: homedir() }, makeContext(["/"])).valid, true);
+  });
+
+  it("checks the default home directory when containerId is omitted", () => {
+    assert.equal(
+      adapter.validateParams(
+        { containerId: undefined },
+        makeContext([join(homedir(), "Documents")])
+      ).valid,
+      false
+    );
+  });
+
+  it("rejects non-string action paths", () => {
+    assert.equal(
+      adapter.validateParams({ parameters: { path: 42 } }, makeContext([homedir()])).valid,
+      false
+    );
+  });
+
+  it("resolves symlinks for validation and paths for execution", () => {
+    const directory = mkdtempSync(join(tmpdir(), "mcp-finder-path-"));
+    try {
+      const allowed = join(directory, "allowed");
+      const outside = join(directory, "outside");
+      mkdirSync(allowed);
+      mkdirSync(outside);
+      symlinkSync(outside, join(allowed, "escape"));
+      assert.equal(
+        adapter.validateParams({ id: join(allowed, "escape", "new-file") }, makeContext([allowed]))
+          .valid,
+        false
+      );
+      assert.equal(
+        adapter.validateParams({ id: join(allowed, "new-file") }, makeContext([allowed])).valid,
+        true
+      );
+      assert.equal(adapter.list({ containerId: allowed }).parameters.path, realpathSync(allowed));
+      assert.equal(adapter.list({}).parameters.path, realpathSync(homedir()));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -232,10 +286,7 @@ describe("SafariAdapter.validateParams", () => {
   });
 
   it("allows other actions regardless of doJavaScript setting", () => {
-    const result = adapter.validateParams(
-      { action: "show", parameters: {} },
-      makeContext(false)
-    );
+    const result = adapter.validateParams({ action: "show", parameters: {} }, makeContext(false));
     assert.equal(result.valid, true);
   });
 

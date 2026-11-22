@@ -49,9 +49,7 @@ function buildListNotes(bundleId: string, parameters: Record<string, unknown>): 
   const limit = (parameters["limit"] as number | undefined) ?? 50;
   const offset = (parameters["offset"] as number | undefined) ?? 0;
 
-  const targetClause = folderId
-    ? `notes of folder id "${esc(folderId)}"`
-    : "notes";
+  const targetClause = folderId ? `notes of folder id "${esc(folderId)}"` : "notes";
 
   return `tell application id "${bundleId}"
     set allNotes to ${targetClause}
@@ -94,9 +92,11 @@ function buildSearchNotes(bundleId: string, parameters: Record<string, unknown>)
   const query = parameters["query"] as string | undefined;
   if (!query) throw new Error("notes.search_notes requires 'query' parameter");
   const limit = (parameters["limit"] as number | undefined) ?? 20;
+  const folderId = (parameters["folderId"] as string | undefined) ?? "";
+  const target = folderId ? `notes of folder id "${esc(folderId)}"` : "notes";
 
   return `tell application id "${bundleId}"
-    set matchingNotes to notes whose name contains "${esc(query)}"
+    set matchingNotes to (${target} whose name contains "${esc(query)}" or plaintext contains "${esc(query)}")
     set resultCount to count of matchingNotes
     if resultCount > ${limit} then set resultCount to ${limit}
     set output to "["

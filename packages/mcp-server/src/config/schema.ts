@@ -1,76 +1,58 @@
 import { z } from "zod";
 
-export const AppConfigSchema = z.object({
-  enabled: z.boolean().default(true),
-  allowedTools: z.array(z.string()).default([]),
-});
+export const AppNameSchema = z.enum([
+  "notes",
+  "calendar",
+  "reminders",
+  "mail",
+  "contacts",
+  "messages",
+  "photos",
+  "music",
+  "finder",
+  "safari",
+]);
+export type AppName = z.infer<typeof AppNameSchema>;
 
-export type AppConfig = z.infer<typeof AppConfigSchema>;
+export const PermissionSchema = z.enum(["off", "read", "readwrite"]);
+export type Permission = z.infer<typeof PermissionSchema>;
 
-export const RunScriptConfigSchema = z.object({
-  enabled: z.boolean().default(false),
-  allowedBundleIds: z.array(z.string()).default([]),
-});
-
-export type RunScriptConfig = z.infer<typeof RunScriptConfigSchema>;
+export const PermissionsSchema = z
+  .object({
+    default: PermissionSchema.default("off"),
+    apps: z.record(AppNameSchema, PermissionSchema).default({}),
+  })
+  .strict();
+export type Permissions = z.infer<typeof PermissionsSchema>;
 
 export const SafariConfigSchema = z.object({
   doJavaScript: z.boolean().default(false),
 });
-
 export type SafariConfig = z.infer<typeof SafariConfigSchema>;
 
 export const FinderConfigSchema = z.object({
-  allowedPaths: z.array(z.string()).default([]),
+  allowedPaths: z.array(z.string().min(1)).default([]),
 });
-
 export type FinderConfig = z.infer<typeof FinderConfigSchema>;
 
 export const LoggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   redact: z.array(z.string()).default([]),
 });
-
 export type LoggingConfig = z.infer<typeof LoggingConfigSchema>;
 
-export const OperationModeSchema = z.enum(["readonly", "create", "full"]).default("readonly");
-
-/** Tools introduced at each mode level. Modes are cumulative. */
-export const ModesConfigSchema = z.object({
-  readonly: z.array(z.string()).default([
-    "applescript.ping",
-    "applescript.get_mode",
-    "applescript.set_mode",
-    "app.list_containers",
-    "app.list",
-    "app.get",
-    "app.search",
-  ]),
-  create: z.array(z.string()).default([
-    "app.create",
-    "app.action",
-    "applescript.run_template",
-  ]),
-  full: z.array(z.string()).default([
-    "app.update",
-    "app.delete",
-    "applescript.run_script",
-  ]),
-});
-
-export type ModesConfig = z.infer<typeof ModesConfigSchema>;
-
-export const ConfigSchema = z.object({
-  defaultTimeoutMs: z.number().int().positive().default(12000),
-  defaultMode: OperationModeSchema.default("readonly"),
-  modes: ModesConfigSchema.default({}),
-  apps: z.record(z.string(), AppConfigSchema).default({}),
-  runScript: RunScriptConfigSchema.default({}),
-  safari: SafariConfigSchema.default({}),
-  finder: FinderConfigSchema.default({}),
-  logging: LoggingConfigSchema.default({}),
-});
+export const ConfigSchema = z
+  .object({
+    defaultTimeoutMs: z.number().int().positive().default(12000),
+    permissions: PermissionsSchema.default({}),
+    profiles: z
+      .record(z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/), PermissionsSchema)
+      .default({}),
+    safari: SafariConfigSchema.default({}),
+    finder: FinderConfigSchema.default({}),
+    logging: LoggingConfigSchema.default({}),
+  })
+  .strict();
 
 export type Config = z.infer<typeof ConfigSchema>;
-
 export const DEFAULT_CONFIG: Config = ConfigSchema.parse({});

@@ -1,149 +1,141 @@
-# Tool design
+# Tools and authorization
 
-## Principles
-
-- **Generic CRUD over per-app tools.** A single set of 8 CRUD tools (`app.list_containers`, `app.list`, `app.get`, `app.search`, `app.create`, `app.update`, `app.delete`, `app.action`) works across all 10 apps. Each app is selected via the `app` parameter.
-- **Controlled AppleScript execution.** Templates are parameterized with strict schemas. User input is escaped at compile-time (`esc()`) and runtime (`jsonEsc()`).
-- **Defense-in-depth security.** Three layers: operation modes, policy allowlists, and confirmation tokens for destructive actions.
-- **Explicit opt-in.** Nothing works unless configured. Finder requires `allowedPaths`. Safari `do_javascript` must be enabled. `run_script` is disabled by default.
-- **Dry-run support.** Every tool supports `dryRun: true` to return the generated AppleScript without executing it.
+The server exposes stdio only. Each process has immutable permissions selected at
+startup with `--profile NAME`, or the global maximum when no profile is selected.
+See [configuration and profile examples](../README.md#permissions-and-named-profiles).
 
 ## Tool set
 
-### System tools (always available)
+| Tool | Required access | Parameters beyond `app` and optional `dryRun` |
+|---|---|---|
+| `applescript.ping` | None | None; no `app` or `dryRun` |
+| `applescript.get_permissions` | None | None; reports `profile` (null if absent) and effective per-app `permissions` |
+| `app.list_containers` | `read` | None |
+| `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset` |
+| `app.get` | `read` | `id` |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200) |
+| `app.create` | `readwrite` | `properties`, optional `containerId` |
+| `app.update` | `readwrite` + confirmation | `id`, `properties` |
+| `app.delete` | `readwrite` + confirmation | `id` |
+| `app.action` | See below | `action`, optional `parameters` |
 
-| Tool | Mode | Description |
-|------|------|-------------|
-| `applescript.ping` | readonly | Health check — returns version, app list |
-| `applescript.get_mode` | readonly | Get current operation mode and enabled tools |
-| `applescript.set_mode` | readonly | Change mode (`readonly`, `create`, `full`) |
+`app.action` requires `readwrite` except Music `now_playing`, which requires `read`.
+This includes UI-only actions such as `show`, since those have side effects.
+Unknown actions do not gain read access; adapters reject unsupported actions.
+Actions `send`, `move`, and `do_javascript` additionally require confirmation.
 
-### CRUD tools (mode-gated)
+Only tools usable with the instance's grants are listed. Generic `app` enums contain
+only apps with the required permission; unsupported adapter operations still fail
+explicitly. `app.action` is absent unless an app is readwrite or Music is readable.
+With every app off, only the two `applescript.*` inspection tools remain.
+Authorization is enforced on every invocation, not merely through tool visibility.
+A dry run still requires the same permission and adapter
+validation, but returns the generated script without executing or confirming it.
 
-| Tool | Mode | Description |
-|------|------|-------------|
-| `app.list_containers` | readonly | List containers (folders, calendars, lists, etc.) |
-| `app.list` | readonly | List items (paginated: `limit`, `offset`) |
-| `app.get` | readonly | Get a single item by ID |
-| `app.search` | readonly | Search/filter items by query |
-| `app.create` | create | Create a new item (app-specific properties) |
-| `app.update` | full | Update an existing item (confirmation required) |
-| `app.delete` | full | Delete an item (confirmation required) |
-| `app.action` | create | App-specific action (show, complete, send, play, etc.) |
+There are no raw-script, arbitrary-template, or permission-changing tools.
+Templates are an internal implementation detail, never a client-provided dispatch path.
 
-All CRUD tools accept an `app` parameter (e.g. `"notes"`, `"calendar"`, `"finder"`) and a `dryRun` flag.
+## Task-oriented read tools
 
-### Script tools (policy-gated)
+These are advertised only when their app has `read` or `readwrite` access. They reuse
+the generic operations' policy checks, adapters, validation, and executor. They take no
+`app` argument; all accept optional `dryRun`.
 
-| Tool | Mode | Description |
-|------|------|-------------|
-| `applescript.run_template` | create | Execute a registered template by ID + bundle ID |
-| `applescript.run_script` | full | Execute raw AppleScript (confirmation required, policy-gated) |
+| Tool | Inputs | Result |
+|---|---|---|
+| `calendar.list_calendars` | None | Calendar names (also used as IDs; not stable) |
+| `calendar.list_events` | `day: "today" \| "tomorrow"`, or both `startDate` and `endDate`; optional `calendarId`, `limit`, `offset` | Chronological overlapping events with pagination and limitations |
+| `notes.list_folders` | None | Folder IDs, names, item counts |
+| `notes.list_notes` | Optional `folderId`, `limit`, `offset` | `total`, `items`: note IDs, titles, modification dates |
+| `notes.search_notes` | `query`; optional `folderId`, `limit` | Matching IDs, titles, modification dates; searches title or plain-text body |
+| `notes.get_note` | `noteId` from list/search | Full note including `properties.body`, creation/modification dates |
 
-## Supported apps (10)
+List page size defaults to 50; Notes search defaults to 20. Both accept 1-200.
+List offsets start at 0. Notes search returns a limited array, not a complete paginated
+result; narrow the query or folder when necessary. Notes list returns `total` and `items`;
+advance `offset` by the returned item count until reaching `total`.
 
-| App | Bundle ID | Item Type | Container Type |
-|-----|-----------|-----------|----------------|
-| Notes | `com.apple.Notes` | note | folder |
-| Calendar | `com.apple.iCal` | event | calendar |
-| Reminders | `com.apple.reminders` | reminder | list |
-| Mail | `com.apple.mail` | message | mailbox |
-| Contacts | `com.apple.Contacts` | person | group |
-| Messages | `com.apple.MobileSMS` | message | chat |
-| Photos | `com.apple.Photos` | media | album |
-| Music | `com.apple.Music` | track | playlist |
-| Finder | `com.apple.finder` | file | folder |
-| Safari | `com.apple.Safari` | tab | window |
+### Calendar ranges and results
 
-## Operation modes
+For "what's my schedule tomorrow?":
 
-Three cumulative modes control tool availability:
+```json
+{"day":"tomorrow"}
+```
 
-| Mode | Tools available |
-|------|----------------|
-| **readonly** | `ping`, `get_mode`, `set_mode`, `list_containers`, `list`, `get`, `search` |
-| **create** | readonly + `create`, `action`, `run_template` |
-| **full** | create + `update`, `delete`, `run_script` |
-
-Modes are configurable via `config.modes`. Each mode lists the tools introduced at that level; modes are cumulative.
-
-## Confirmation system
-
-Destructive actions (`update`, `delete`, `run_script`, `run_template`) require confirmation:
-
-1. **MCP elicitation** — server asks the client to show a confirmation dialog
-2. **Confirmation token** — fallback: server issues a token that must be passed back on a second call (2-minute TTL, single-use)
-
-## Template approach
-
-Templates are parameterized AppleScript builders in `templates/`. Each app has a module that exports a `build(templateId, bundleId, parameters)` function.
-
-### Escaping (two layers)
-
-1. **Compile-time** (`esc()`): Escapes `\` and `"` in user parameters for safe embedding in AppleScript string literals.
-2. **Runtime** (`jsonEsc()`): AppleScript handlers appended to every script that escape values for safe JSON output (`\`, `"`, CR, LF, tab).
-
-### Template ID convention
-
-`<app>.<operation>` — e.g. `notes.list_notes`, `calendar.create_event`, `finder.delete_item`
-
-## Configuration & policy model
-
-Config file: `~/.config/applescript-mcp/config.json` or `APPLESCRIPT_MCP_CONFIG` env var.
+For an explicit range spanning the spring daylight-saving transition:
 
 ```json
 {
-  "defaultTimeoutMs": 12000,
-  "defaultMode": "readonly",
-  "modes": {
-    "readonly": ["applescript.ping", "applescript.get_mode", "applescript.set_mode", "app.list_containers", "app.list", "app.get", "app.search"],
-    "create": ["app.create", "app.action", "applescript.run_template"],
-    "full": ["app.update", "app.delete", "applescript.run_script"]
-  },
-  "apps": {
-    "com.apple.Notes": {
-      "enabled": true,
-      "allowedTools": []
-    }
-  },
-  "runScript": {
-    "enabled": false,
-    "allowedBundleIds": []
-  },
-  "safari": {
-    "doJavaScript": false
-  },
-  "finder": {
-    "allowedPaths": []
-  },
-  "logging": {
-    "level": "info",
-    "redact": ["email", "content", "body"]
-  }
+  "startDate": "2026-03-08T00:00:00-08:00",
+  "endDate": "2026-03-09T00:00:00-07:00",
+  "limit": 50,
+  "offset": 0
 }
 ```
 
-### Config sections
+`day` uses the Mac's current local calendar day and time zone, including daylight-saving
+boundaries, not the next 24 hours. Do not mix it with explicit bounds. Explicit timestamps
+require seconds and `Z` or a UTC offset, without fractional seconds. The exclusive
+`endDate` must follow `startDate`. Events overlap when their start precedes the end
+bound and their end follows the start bound, including multi-day/all-day events.
+Omit `calendarId` to query all calendars. Calendar's identifier property can fail
+on macOS, so the `id` and `calendarId` fields contain the calendar name instead.
+Renaming a calendar changes this value. If multiple calendars share a name, filtering
+by that name fails explicitly; omit `calendarId` to include all calendars instead.
 
-| Section | Purpose |
-|---------|---------|
-| `defaultTimeoutMs` | Default osascript timeout in ms (default: 12000) |
-| `defaultMode` | Initial operation mode (default: `readonly`) |
-| `modes` | Tool-to-mode mapping (default matches defaults below) |
-| `apps.<bundleId>` | Per-app config: `enabled` (boolean), `allowedTools` (string[]) |
-| `runScript` | Global `run_script` gating: `enabled` (boolean), `allowedBundleIds` (string[]) |
-| `safari.doJavaScript` | Gate Safari `do_javascript` action (default: false) |
-| `finder.allowedPaths` | Path allowlist for Finder operations (default: empty = deny all) |
-| `logging.level` | Log level: `debug`, `info`, `warn`, `error` |
-| `logging.redact` | Field names to redact from log output |
+Calendar list results (including generic `app.list` for Calendar) contain `total`,
+`offset`, `hasMore`, `timeZone` (the Mac's IANA zone), `limitations`, and `items`.
+Each event has `id`, `name`, `calendarId`, `calendarName`, `startDate`, `endDate`,
+`location`, `allDay`, and `recurrence`. Dates are UTC ISO timestamps; empty location
+or recurrence is an empty string. Events are sorted by start then ID before pagination.
+While `hasMore` is true, add the returned item count to `offset` using the same bounds.
 
-### Enforcement rules
+**AppleScript recurrence masters are not expanded into occurrences.** An older
+recurring series may therefore be missing from a future date range. Every result
+includes this limitation; never summarize the result as a complete recurring schedule.
+No EventKit permission or calendar database access is added by these tools.
 
-- **Apps not in config** → denied with explicit error.
-- **Tools not in app's `allowedTools`** → denied (empty list = allow all for that app).
-- **`run_script`** → disabled by default; requires explicit `enabled: true` + optional `allowedBundleIds`.
-- **Safari `do_javascript`** → disabled by default; requires explicit `safari.doJavaScript: true`.
-- **Finder paths** → denied by default; requires explicit `finder.allowedPaths` list.
-- **Timeouts** → always enforced.
-- **Sensitive fields** → redacted in logs based on `logging.redact`.
-- **Confirmation** → required for update, delete, run_script, run_template.
+Initialization instructions describe enabled apps and suggested workflows; tool
+descriptions and schemas provide the same discovery hints for clients that ignore
+instructions. App content is untrusted data, not agent instructions.
+
+## Apps
+
+| App name | Bundle ID | Item type | Container type |
+|---|---|---|---|
+| `notes` | `com.apple.Notes` | note | folder |
+| `calendar` | `com.apple.iCal` | event | calendar |
+| `reminders` | `com.apple.reminders` | reminder | list |
+| `mail` | `com.apple.mail` | message | mailbox |
+| `contacts` | `com.apple.Contacts` | person | group |
+| `messages` | `com.apple.MobileSMS` | message | chat |
+| `photos` | `com.apple.Photos` | media | album |
+| `music` | `com.apple.Music` | track | playlist |
+| `finder` | `com.apple.finder` | file | folder |
+| `safari` | `com.apple.Safari` | tab | window |
+
+App capabilities differ; the presence of a generic tool does not mean every adapter
+supports it. Bundle IDs are internal; configuration and tool inputs use short names.
+
+## Enforcement
+
+1. Zod validates the tool's input.
+2. The policy checks the app's effective `off` / `read` / `readwrite` grant.
+3. Adapter validation applies additional restrictions, including Finder path allowlists
+   and Safari JavaScript opt-in.
+4. The adapter maps to a known template.
+5. Real consequential writes require MCP form elicitation. Missing support, rejection,
+   or cancellation prevents execution. Tokens cannot substitute for user confirmation.
+6. Parameterized AppleScript is executed with a timeout via `osascript`.
+7. macOS independently enforces Automation consent.
+
+Use `finder.allowedPaths` to restrict filesystem scope and `safari.doJavaScript` to
+opt into JavaScript. Neither option grants app access by itself.
+Logging level/redaction and `defaultTimeoutMs` are independent of profiles.
+
+## Template escaping
+
+Internal template IDs follow `<app>.<operation>`, such as `notes.list_notes`.
+`esc()` escapes backslashes and quotes for AppleScript literals. `wrapScript()` appends
+runtime `jsonEsc()` handlers for JSON output.

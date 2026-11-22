@@ -60,8 +60,8 @@ MCP-AppleScript Bridge Server
 
   By running this server you grant an AI model the ability to interact
   with your macOS applications. No automated safeguard is foolproof.
-  Start in readonly mode, enable only the apps you need, and never run
-  in full mode unattended.
+  Grant only the app permissions you need and use a named profile for
+  each trust context. macOS Automation consent is required separately.
 
   Provided as-is with no warranty. See LICENSE.
 
@@ -73,11 +73,14 @@ Installation:
        mkdir -p ~/.config/applescript-mcp
        cat > ~/.config/applescript-mcp/config.json << 'EOF'
        {
-         "defaultMode": "readonly",
-         "apps": {
-           "com.apple.Notes": { "enabled": true },
-           "com.apple.Calendar": { "enabled": true },
-           "com.apple.Mail": { "enabled": true }
+         "permissions": {
+           "default": "off",
+           "apps": { "notes": "read", "calendar": "read" }
+         },
+         "profiles": {
+           "research": {
+             "apps": { "notes": "read", "calendar": "read" }
+           }
          }
        }
        EOF
@@ -86,7 +89,8 @@ Installation:
        {
          "mcpServers": {
            "applescript": {
-             "command": "/usr/local/bin/mcp-applescript"
+             "command": "/usr/local/bin/mcp-applescript",
+             "args": ["--profile", "research"]
            }
          }
        }

@@ -1,29 +1,38 @@
 # Testing
 
-### Unit tests (Node, macOS or Linux)
+## Unit tests
 
-Run: `pnpm test:unit` (or `pnpm test`)
+Run `pnpm test:unit`.
 
-Tests cover:
+Tests use `node:test` and cover adapters, configuration, CLI flags, permissions,
+confirmation, executor behavior, errors, JSON, logging, and adapter validation.
+Policy tests exercise all ten apps at every permission level, global overrides,
+all ceiling/profile combinations, immutable grants, and simultaneous profile isolation.
+Finder tests cover traversal, symlinks, root grants, default paths, and path resolution.
+Executor tests invoke simple non-app AppleScript on macOS.
 
-| Module | Tests |
-|--------|-------|
-| **Adapters** | All 10 adapters: info correctness, template IDs, parameter passing, unsupported operations |
-| **Config** | Config file loading, env var override, schema validation, defaults |
-| **Validation** | Finder path allowlist (empty deny, allowed/denied paths, `~` resolution, subpaths, `properties.parentPath/destPath`, action params), Safari `do_javascript` gating, `runValidation` helper behavior |
-| **Executor** | Dry run (template + raw), osascript execution, error classification, timeouts, non-JSON output |
-| **Mode** | Default readonly, custom default, setMode, listeners, enabled/disabled tools, tool-to-mode map, destructive flags |
-| **Confirmation** | Token issuance, acceptance, single-use consumption, action mismatch, expiration, invalid tokens |
-| **Policy** | Tools without bundleId, app-scoped tools (enabled/disabled/configured), run_script gating, helper methods |
-| **Errors** | McpAppleScriptError, PolicyDeniedError, ExecutorError, ConfigError, JSON serialization |
-| **JSON** | safeJsonParse (valid/invalid/arrays/primitives), safeJsonStringify (objects/pretty/circular) |
-| **Logging** | Log levels, field redaction, nested redaction |
-| **Server** | Server creation |
+## Protocol integration tests
 
-### Integration tests (macOS only)
+Run `pnpm test:integration`.
 
-Run: `pnpm test:integration`
+Tests launch independent stdio server processes with temporary configuration through
+the MCP SDK client. They verify startup, tool discovery, simultaneous profile isolation,
+read/write/off boundaries for every CRUD tool, the global ceiling, read-only action
+classification, missing confirmation support, removed escalation/execution tools,
+and explicit startup failures.
 
-- E2E tests for all 10 apps (Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, Safari)
-- MCP server protocol tests (stdio transport, tool registration, tool calling)
-- Gated behind `APPLESCRIPT_E2E` env var; skipped in CI unless explicitly enabled
+App operation tests use dry runs or guaranteed pre-execution denials; they do not read
+or write personal app data. They do not inherit the user's configured permissions.
+
+## Real-app acceptance tests (macOS, opt-in)
+
+Run `APPLESCRIPT_E2E=1 pnpm test:integration` locally, with `CI` unset.
+
+These tests grant a dedicated profile read access to all supported apps using temporary
+configuration. Finder gets an explicit home-directory allowlist. Tests read real
+containers, may trigger macOS Automation consent prompts, and assert structured output.
+They never write app data. Errors are failures rather than accepted substitutes for
+working app communication.
+
+They are always skipped in CI. Passing unit/protocol tests does not prove that each
+app's AppleScript dictionary or behavior is compatible with the installed macOS version.

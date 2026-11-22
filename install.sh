@@ -38,23 +38,15 @@ if [ ! -f "$CONFIG_DIR/config.json" ]; then
     cat > "$CONFIG_DIR/config.json" << 'EOF'
 {
   "defaultTimeoutMs": 12000,
-  "apps": {
-    "com.apple.Notes": {
-      "enabled": true,
-      "allowedTools": ["notes.create_note", "applescript.run_template"]
-    },
-    "com.apple.iCal": {
-      "enabled": true,
-      "allowedTools": ["calendar.create_event"]
-    },
-    "com.apple.mail": {
-      "enabled": true,
-      "allowedTools": ["mail.compose_draft"]
-    }
+  "permissions": {
+    "default": "off",
+    "apps": {}
   },
-  "runScript": {
-    "enabled": false,
-    "allowedBundleIds": []
+  "profiles": {
+    "research": {
+      "default": "off",
+      "apps": { "notes": "read", "calendar": "read" }
+    }
   },
   "logging": {
     "level": "info",
@@ -62,9 +54,10 @@ if [ ! -f "$CONFIG_DIR/config.json" ]; then
   }
 }
 EOF
-    echo "✓ Created default config at $CONFIG_DIR/config.json"
+    echo "✓ Created config at $CONFIG_DIR/config.json (all access off until you grant permissions)"
 else
-    echo "✓ Config already exists at $CONFIG_DIR/config.json"
+    echo "✓ Existing config preserved at $CONFIG_DIR/config.json"
+    echo '  Legacy apps/modes/runScript configurations must be migrated to permissions/profiles.'
 fi
 echo ""
 
@@ -78,11 +71,12 @@ echo "  {"
 echo "    \"mcpServers\": {"
 echo "      \"applescript\": {"
 echo "        \"command\": \"node\","
-echo "        \"args\": [\"$REPO_DIR/packages/mcp-server/dist/index.js\"]"
+echo "        \"args\": [\"$REPO_DIR/packages/mcp-server/dist/index.js\", \"--profile\", \"research\"]"
 echo "      }"
 echo "    }"
 echo "  }"
 echo ""
+echo 'Grant app access in the config permissions ceiling before using a profile. See README.md.'
 echo "⚠️  On first use, macOS will prompt for Automation permissions."
 echo "   Go to System Settings → Privacy & Security → Automation to manage."
 echo ""

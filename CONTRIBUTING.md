@@ -20,17 +20,20 @@ pnpm build
   - `src/adapters/` — Per-app resource adapters
   - `src/templates/` — AppleScript template builders (one per app)
   - `src/exec/` — osascript executor
-  - `src/http.ts` — Streamable HTTP transport
+  - `src/policy/` — Immutable per-app grants and named profiles (stdio only)
 - `docs/` — Architecture and design documentation
 
 ## Running Tests
 
 ```bash
-# Unit tests only (fast, no macOS APIs needed)
+# Unit tests (simple executor tests use osascript on macOS)
 pnpm test:unit
 
-# Integration tests (requires macOS + TCC permissions)
+# Protocol integration tests (isolated config, no personal app access)
 pnpm test:integration
+
+# Opt-in real-app reads (macOS + TCC permissions)
+APPLESCRIPT_E2E=1 pnpm test:integration
 
 # All tests
 pnpm test
@@ -57,7 +60,7 @@ pnpm test
 2. Register in `adapters/index.ts` and `server.ts`
 3. Create `packages/mcp-server/src/templates/{app}.ts` with `export function build()`
 4. Add to the `builders` map in `templates/index.ts`
-5. Add policy configuration for the target app
+5. Add the short app name to `AppNameSchema` in `config/schema.ts`; classify any read-only actions explicitly in policy
 6. Write unit tests and integration tests
 7. Update README.md with the new app
 

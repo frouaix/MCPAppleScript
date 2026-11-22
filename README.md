@@ -1,107 +1,31 @@
 # MCP-AppleScript
 
-A local MCP server that exposes controlled AppleScript automation tools to MCP clients on macOS.
+A local, **stdio-only** MCP server for controlled AppleScript automation on macOS.
 
 > [!CAUTION]
-> **This software can read, create, modify, and delete your personal data** across Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, and Safari.
->
-> By running this server you are granting an AI model the ability to interact with your macOS applications on your behalf. Although multiple safety layers exist (operation modes, per-app allowlists, destructive-action confirmation), **no automated safeguard is foolproof**. An unexpected prompt, a misconfigured policy, or a model hallucination could result in **data loss, disclosure of private information, or unintended actions** such as sending messages or emails.
->
-> **You are solely responsible for:**
-> - Reviewing and understanding the [configuration](#configuration) and [policy model](#policy-model) before enabling any app
-> - Starting in `readonly` mode and only escalating when you understand the consequences
-> - Keeping the number of enabled apps to the minimum you actually need
-> - Never running in `full` mode unattended
->
-> This project is provided **as-is, with no warranty**. See [LICENSE](LICENSE).
+> This software can read, create, modify, and delete personal data in local apps.
+> Enable only the access you need. A `readwrite` grant allows writes, not just drafts:
+> some operations require additional user confirmation, but no safeguard is foolproof.
+> Data returned to your MCP client may be sent to that client's model provider.
+> This project is provided as-is, with no warranty. See [LICENSE](LICENSE).
 
-## Overview
+## Architecture
 
-MCP-AppleScript provides a secure bridge between the [Model Context Protocol](https://modelcontextprotocol.io/) and macOS automation via AppleScript. It consists of two components:
+```text
+MCP client -> TypeScript server -> osascript -> macOS apps (Apple Events)
+```
 
-- **MCP Server (TypeScript/Node.js)**: Handles the MCP protocol, tool schemas, configuration, validation, logging, and policy enforcement
-- **Swift Executor**: Executes AppleScript commands via `NSAppleScript` and returns structured JSON results
+The server validates requests, enforces immutable per-app permissions, maps operations
+through app adapters, and executes parameterized AppleScript. There is no Swift helper,
+HTTP listener, raw-script tool, or arbitrary-template tool.
 
-## Tools
-
-All 10 Apple apps are accessed through generic `app.*` tools with an `app` parameter:
-
-| Tool | Mode | Description |
-|------|------|-------------|
-| `applescript.ping` | readonly | Health check — returns server version and supported apps |
-| `applescript.get_mode` | readonly | Get current operation mode and enabled tools |
-| `applescript.set_mode` | readonly | Change operation mode (readonly/create/full) |
-| `app.list_containers` | readonly | List containers (folders, calendars, mailboxes, playlists, etc.) |
-| `app.list` | readonly | List items in a container with pagination |
-| `app.get` | readonly | Get a single item by ID |
-| `app.search` | readonly | Search/filter items |
-| `app.create` | create | Create a new item |
-| `app.action` | create | App-specific actions (send, play, complete, do_javascript, etc.) |
-| `applescript.run_template` | create | Execute a registered template by ID (policy-gated) |
-| `app.update` | full | Update an item (confirmation required) |
-| `app.delete` | full | Delete an item (confirmation required) |
-| `applescript.run_script` | full | Execute raw AppleScript (confirmation required) |
-
-### Supported Apps
-
-Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, Safari
-
-## Operation Modes
-
-The server starts in **readonly** mode by default. Use `applescript.set_mode` to change modes on-the-fly:
-
-| Mode | Description | Available Tools |
-|------|-------------|-----------------|
-| **readonly** | No creation, editing, or deleting | ping, get_mode, set_mode, app.list/get/search/list_containers |
-| **create** | Readonly + creation allowed | + app.create, app.action, run_template |
-| **full** | All operations, potentially destructive | + app.update, app.delete, run_script (requires confirmation) |
-
-When the mode changes, the client is notified via `notifications/tools/list_changed` and will only see tools available in the current mode.
-
-### Destructive Action Confirmation
-
-In **full** mode, destructive tools (`app.update`, `app.delete`, `run_script`) require user confirmation:
-1. If the MCP client supports **elicitation**, a confirmation dialog is shown
-2. Otherwise, a **confirmation token** is returned — pass it back in a second call to confirm
-
-## Requirements
-
-- macOS 12.0 or later
-- Node.js 20+ (only for building from source)
-- Swift 5.9+ (only for building from source)
-- pnpm 8+ (only for building from source)
+Adapters exist for Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music,
+Finder, and Safari. Support varies by app; not every app implements every CRUD operation.
+Actual app automation depends on macOS scripting support and Automation consent.
 
 ## Installation
 
-### Option 1: Download pre-built binary (.dmg)
-
-Download the latest `.dmg` from [GitHub Releases](https://github.com/frouaix/MCPAppleScript/releases):
-
-1. Open the `.dmg` and copy `mcp-applescript` to `/usr/local/bin/`:
-   ```bash
-   sudo cp /Volumes/MCP-AppleScript\ */mcp-applescript /usr/local/bin/
-   ```
-2. Create a config file:
-   ```bash
-   mkdir -p ~/.config/applescript-mcp
-   cat > ~/.config/applescript-mcp/config.json << 'EOF'
-   {
-     "defaultMode": "readonly",
-     "apps": {
-       "com.apple.Notes": { "enabled": true },
-       "com.apple.iCal": { "enabled": true },
-       "com.apple.reminders": { "enabled": true },
-       "com.apple.mail": { "enabled": true },
-       "com.apple.Contacts": { "enabled": true }
-     }
-   }
-   EOF
-   ```
-3. Add to your MCP client config (see Claude Desktop below)
-
-The pre-built binary is a self-contained executable with Node.js and the Swift executor embedded — no runtime dependencies required.
-
-### Option 2: Build from source
+For source builds, install Node.js 20+ and pnpm 8+ on macOS:
 
 ```bash
 git clone https://github.com/frouaix/MCPAppleScript.git
@@ -109,68 +33,56 @@ cd MCPAppleScript
 ./install.sh
 ```
 
-The install script will:
-1. Install Node.js dependencies
-2. Build the TypeScript MCP server
-3. Build and install the Swift executor to `/usr/local/bin/`
-4. Create a default config at `~/.config/applescript-mcp/config.json`
+The installer installs dependencies, builds TypeScript, and creates a configuration at
+`~/.config/applescript-mcp/config.json` if one does not exist. **All access starts off**;
+edit the permissions ceiling before use. Existing configuration is never overwritten.
 
-### Claude Desktop Integration
+For a standalone executable, download a `.dmg` from
+[GitHub Releases](https://github.com/frouaix/MCPAppleScript/releases) and copy
+`mcp-applescript` to a directory in your PATH. Older releases may still implement the
+previous permission model; these instructions describe the current source.
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+## Permissions and named profiles
+
+Configuration is loaded from `~/.config/applescript-mcp/config.json`, or the file named
+by `APPLESCRIPT_MCP_CONFIG`.
+
+| Permission | Access |
+|---|---|
+| `off` | No app operations |
+| `read` | List containers, list, get, search, and Music's `now_playing` action |
+| `readwrite` | Read access plus supported creation, update, deletion, and actions |
+
+`permissions` is the user-approved maximum. A named profile can only narrow it:
 
 ```json
 {
-  "mcpServers": {
-    "applescript": {
-      "command": "/usr/local/bin/mcp-applescript"
+  "permissions": {
+    "default": "off",
+    "apps": {
+      "notes": "readwrite",
+      "calendar": "readwrite",
+      "mail": "read"
     }
-  }
-}
-```
-
-If building from source, use the dev path instead:
-```json
-{
-  "mcpServers": {
-    "applescript": {
-      "command": "node",
-      "args": ["/path/to/MCPAppleScript/packages/mcp-server/dist/index.js"]
+  },
+  "profiles": {
+    "research": {
+      "apps": {
+        "notes": "read",
+        "calendar": "read",
+        "mail": "read"
+      }
+    },
+    "organizer": {
+      "apps": {
+        "notes": "readwrite",
+        "calendar": "readwrite"
+      }
     }
-  }
-}
-```
-
-## Configuration
-
-Configuration lives at `~/.config/applescript-mcp/config.json` (override via `APPLESCRIPT_MCP_CONFIG` env var):
-
-```json
-{
-  "executorPath": "/usr/local/bin/applescript-executor",
+  },
   "defaultTimeoutMs": 12000,
-  "defaultMode": "readonly",
-  "modes": {
-    "readonly": ["applescript.ping", "applescript.get_mode", "applescript.set_mode", "app.list_containers", "app.list", "app.get", "app.search"],
-    "create": ["app.create", "app.action", "applescript.run_template"],
-    "full": ["app.update", "app.delete", "applescript.run_script"]
-  },
-  "apps": {
-    "com.apple.Notes": { "enabled": true },
-    "com.apple.iCal": { "enabled": true },
-    "com.apple.reminders": { "enabled": true },
-    "com.apple.mail": { "enabled": true },
-    "com.apple.Contacts": { "enabled": true },
-    "com.apple.MobileSMS": { "enabled": true },
-    "com.apple.Photos": { "enabled": true },
-    "com.apple.Music": { "enabled": true },
-    "com.apple.finder": { "enabled": true },
-    "com.apple.Safari": { "enabled": true }
-  },
-  "runScript": {
-    "enabled": false,
-    "allowedBundleIds": []
-  },
+  "finder": { "allowedPaths": [] },
+  "safari": { "doJavaScript": false },
   "logging": {
     "level": "info",
     "redact": ["email", "content", "body"]
@@ -178,121 +90,142 @@ Configuration lives at `~/.config/applescript-mcp/config.json` (override via `AP
 }
 ```
 
-### Modes
+Use the short app names shown above and `reminders`, `contacts`, `messages`, `photos`,
+`music`, `finder`, `safari` -- not bundle IDs. Unknown app names and invalid permissions
+are rejected.
 
-The `modes` section controls which tools are available at each operation mode level. Modes are cumulative — `create` includes all `readonly` tools, `full` includes all `create` tools. You can customize this to promote tools to a lower mode or restrict them to a higher one.
+- Set `permissions.default` to `read` or `readwrite` to grant that maximum for all
+  supported apps; explicit `permissions.apps` entries override it, including `off`.
+- Each profile also has `default` and `apps`. Its default is `off`, so omitted apps
+  are denied unless the profile explicitly sets a different default.
+- **Effective access = the lower of the global maximum and the selected profile's
+  grant, per app.** A profile requesting `readwrite` cannot exceed a global `read`.
+- Without `--profile`, the instance uses the global permissions directly.
+- Unknown profiles and unsupported CLI arguments fail startup. `--help` prints usage.
+- Permissions are a startup snapshot. Edit the configuration and restart the instance
+  to change them. No MCP tool can change grants.
 
-### Policy Model
+Finder additionally requires `finder.allowedPaths`, for example `["~/Documents"]`.
+Its default list/container operations target the home directory and are denied if
+that directory is outside the allowlist; use an allowed `containerId` for list/search.
+Paths are resolved, including existing symlinks, for validation and execution.
+Safari's `do_javascript` additionally requires `safari.doJavaScript: true`.
 
-- **Per-app allowlists**: Each app must be explicitly configured and enabled
-- **Per-tool permissions**: Control which tools can target which apps
-- **Per-mode tool gating**: Each tool requires a minimum mode level (configurable via `modes`)
-- **`run_script` disabled by default**: Raw AppleScript execution requires explicit opt-in
-- **Timeouts enforced**: All operations are time-bounded
+### MCP client configuration
 
-## Automation Permissions (TCC)
+Configure separate stdio instances for separate trust contexts:
 
-On first use, macOS will prompt for automation permissions:
-
-1. Open **System Settings** → **Privacy & Security** → **Automation**
-2. Find your terminal or the executor binary
-3. Enable permissions for the apps you want to automate (Notes, Calendar, Reminders, Mail, Contacts, etc.)
-
-If you see `AUTOMATION_DENIED` errors, check these permissions.
-
-## Architecture
-
+```json
+{
+  "mcpServers": {
+    "mac-research": {
+      "command": "node",
+      "args": ["/path/to/MCPAppleScript/packages/mcp-server/dist/index.js", "--profile", "research"]
+    },
+    "mac-organizer": {
+      "command": "node",
+      "args": ["/path/to/MCPAppleScript/packages/mcp-server/dist/index.js", "--profile", "organizer"]
+    }
+  }
+}
 ```
-MCP Client (Claude, etc.)
-    ↕ stdio (JSON-RPC)
-TypeScript MCP Server
-    ↕ JSON over stdin/stdout
-Swift Executor (applescript-executor)
-    ↕ Apple Events
-macOS Apps (Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music, Finder, Safari)
-```
 
-The Node process is the only MCP-facing component. Swift is a helper invoked locally for each tool call. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+For the standalone executable, use `"command": "/usr/local/bin/mcp-applescript"`
+and `"args": ["--profile", "research"]`.
+
+**The MCP host must decide which instance a session can use.** Registering both
+instances does not isolate conversations if the host exposes both to every session.
+Use per-session server configuration when supported, or separate host configurations.
+Profiles are not a sandbox against processes already running as your macOS user:
+an agent with unrestricted shell/file access could change the config or bypass this server.
+
+### macOS consent and confirmation
+
+Server permissions and macOS Automation consent are separate checks. On first use,
+macOS may ask permission for the launching application to control a target app.
+Review **System Settings > Privacy & Security > Automation** if access is denied.
+The exact attribution depends on how the client launches the server.
+
+Updates, deletions, and actions named `send`, `move`, or `do_javascript` require user
+confirmation through MCP **form elicitation**, in addition to `readwrite`.
+If the client does not support form elicitation, those operations are blocked.
+Declining or cancelling stops the operation; there is no model-echoed token fallback.
+Dry runs still require the appropriate app permission and pass adapter validation,
+but do not request confirmation or execute AppleScript.
+
+Other supported writes (for example creation, reminder completion, and playback)
+are authorized by `readwrite` without an additional confirmation prompt.
+
+### Migrating old configuration
+
+Legacy `apps`, `defaultMode`, `modes`, `runScript`, and `executorPath` keys now cause
+an explicit startup error rather than being silently ignored.
+
+Replace these sections with `permissions` and `profiles`, translating enabled apps
+to short names and choosing `read` or `readwrite` explicitly. Disabled apps become
+`off`. Tool allowlists do not migrate automatically. Remove mode-changing calls
+from clients; use `applescript.get_permissions` to inspect access instead.
+HTTP flags and the `applescript.run_script` / `applescript.run_template` tools have
+been removed because they do not fit scoped stdio access.
+
+## Tools
+
+| Tool | Required access |
+|---|---|
+| `applescript.ping` | None; health and supported-app discovery |
+| `applescript.get_permissions` | None; effective grants and selected profile |
+| `calendar.list_calendars`, `calendar.list_events` | Calendar `read`; calendars and date-filtered schedules |
+| `notes.list_folders`, `notes.list_notes`, `notes.search_notes`, `notes.get_note` | Notes `read`; browse, search titles/body, read content |
+| `app.list_containers`, `app.list`, `app.get`, `app.search` | `read` |
+| `app.create`, `app.update`, `app.delete` | `readwrite` |
+| `app.action` | `readwrite`, except Music `now_playing` requires `read` |
+
+Tools and generic `app` choices are filtered by the instance's effective permissions.
+A Notes/Calendar read-only profile exposes their named read tools and generic reads,
+not write tools. Server initialization instructions and tool descriptions tell agents
+which apps contain notes, schedules, appointments, and meetings. Clients may ignore
+initialization instructions; descriptions and input schemas carry that guidance too.
+**Every call is authorized independently**, including direct calls and dry runs.
+Unsupported adapter operations fail explicitly.
+
+For "what's my schedule tomorrow?", use `calendar.list_events` with `{"day":"tomorrow"}`.
+The Mac resolves local midnight boundaries, filters overlapping events, sorts them
+chronologically, and returns paginated UTC timestamps. **Recurring events are not
+expanded into occurrences: this is not yet a complete recurring agenda.** Results
+and tool guidance disclose this limitation. See [docs/TOOLS.md](docs/TOOLS.md) for
+date ranges, pagination, and Notes examples. Restart the MCP instance after rebuilding
+to refresh the tools advertised to the client.
 
 ## Development
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Build everything
 pnpm build
-
-# Run unit tests (150 tests)
 pnpm test:unit
-
-# Run integration tests (4 tests, requires macOS)
 pnpm test:integration
+pnpm lint
 
-# Build Swift executor
-cd packages/executor-swift && swift build
+# Real-app reads: opt in locally; may prompt for Automation consent
+APPLESCRIPT_E2E=1 pnpm test:integration
 
-# Run the server in development mode
-cd packages/mcp-server && pnpm dev
-```
+# Run a selected profile
+node packages/mcp-server/dist/index.js --profile research
 
-### Building the standalone binary
-
-```bash
-# Build self-contained binary (Node.js SEA + embedded Swift executor)
+# Build the standalone binary, then package it
 pnpm build:sea
-
-# Package as .dmg
 pnpm build:dmg
 ```
 
-Output: `dist/mcp-applescript` (~107MB, ~40MB as .dmg)
+Protocol integration tests use temporary configuration and dry runs; they do not
+access personal apps. Real-app tests are opt-in and perform reads only.
+Passing protocol tests does not establish that every adapter works on your macOS version.
 
-## Security
-
-- **Three operation modes** (readonly → create → full) with safe default
-- **Destructive action confirmation** via MCP elicitation or confirmation tokens
-- **Template-based execution** prevents arbitrary script injection
-- **Per-app, per-tool permission model** with explicit allowlists
-- **Input validation** with Zod schemas on all tool parameters
-- **Sensitive data redaction** in logs (configurable)
-- **Timeout enforcement** on all executor operations
-- **Stable error codes** for all failure modes
-
-## Project Structure
-
-```
-MCPAppleScript/
-  packages/
-    mcp-server/          # TypeScript MCP server
-      src/
-        index.ts         # Stdio entrypoint
-        server.ts        # MCP server + tool registration
-        sea.ts           # SEA binary support (executor extraction)
-        adapters/        # ResourceAdapter pattern: per-app adapters (10 apps)
-        config/          # Configuration loading + Zod schemas
-        mode/            # Operation mode manager + confirmation
-        policy/          # Allowlist/denylist enforcement
-        exec/            # Executor spawning + IPC
-        util/            # Errors, logging, JSON utils
-    executor-swift/      # Swift executor CLI
-      Sources/Executor/
-        main.swift       # JSON dispatcher
-        AppleScriptRunner.swift  # Template dispatch to per-app modules
-        {App}Templates.swift     # Per-app AppleScript templates (10 files)
-        AppTargeting.swift       # Bundle ID handling
-        Errors.swift     # Error code mapping
-        JsonIO.swift     # Stdin/stdout JSON I/O
-  scripts/
-    build-sea.sh         # Build self-contained binary (Node.js SEA)
-    build-dmg.sh         # Package binary as .dmg
-  docs/                  # Architecture documentation
-  install.sh             # One-step installer (build from source)
-```
+See [architecture](docs/ARCHITECTURE.md), [repository layout](docs/FILES.md),
+[testing](docs/TESTING.md), and [contributing](CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT -- see [LICENSE](LICENSE).
 
 ## Author
 
