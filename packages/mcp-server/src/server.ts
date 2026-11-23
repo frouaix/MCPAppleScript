@@ -58,10 +58,10 @@ export function createServer(deps: ServerDeps): McpServer {
     {
       capabilities: { tools: {} },
       instructions: [
-        "Read and automate local macOS apps through AppleScript. Only profile-authorized tools and apps are advertised.",
+        "Read and automate local macOS apps. Calendar uses EventKit; other apps use AppleScript. Only profile-authorized tools and apps are advertised.",
         `Effective permissions: ${JSON.stringify(policy.getPermissions())}. Permissions cannot be changed through tools.`,
         policy.getPermissions().calendar !== "off"
-          ? 'For schedules, appointments, or meetings use calendar.list_events. For tomorrow use day:"tomorrow"; for today use day:"today". These resolve dates on the Mac in its local time zone. Use ISO timestamps with offsets for other ranges. Follow hasMore with offset pagination. Disclose the returned recurrence limitation; do not claim a complete recurring schedule.'
+          ? 'For schedules, appointments, or meetings use calendar.list_events. For tomorrow use day:"tomorrow"; for today use day:"today". These resolve dates on the Mac in its local time zone. Present event times in the returned local time zone. Use ISO timestamps with offsets for other ranges. Follow hasMore with offset pagination. EventKit includes recurring occurrences, but may expose fewer calendars than the Calendar app; disclose this limitation.'
           : "Apple Calendar access is disabled.",
         policy.getPermissions().notes !== "off"
           ? "For notes use notes.search_notes to find titles/body text, notes.list_folders and notes.list_notes to browse, and notes.get_note to read full text."
@@ -81,7 +81,7 @@ export function createServer(deps: ServerDeps): McpServer {
     registeredTools.set(name, tool);
   }
 
-  /** Execute a template via osascript and return MCP tool result. */
+  /** Execute an internal operation and return an MCP tool result. */
   const executeTemplate: ExecuteTemplateFn = async (templateId, bundleId, parameters, dryRun) => {
     const { runExecutor } = await import("./exec/executor.js");
 

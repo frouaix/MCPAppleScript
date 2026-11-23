@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppRegistry, ResourceAdapter, ValidationContext } from "../adapters/index.js";
 import { PolicyEngine } from "../policy/policy.js";
 import { AppNameSchema } from "../config/schema.js";
+import { resolveEventRange, timestamp } from "./calendar-range.js";
 
 export type ExecuteTemplateFn = (
   templateId: string,
@@ -102,7 +103,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
   const dryRunParam = z
     .boolean()
     .optional()
-    .describe("If true, return the generated script without executing it");
+    .describe("If true, return the execution plan without accessing app data");
 
   // --- app.list_containers ---
   registerTool(
@@ -141,7 +142,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
     "app.list",
     server.tool(
       "app.list",
-      "List items (notes, events, reminders, etc.) in an Apple app, optionally within a container",
+      "List items (notes, events, reminders, etc.) in an Apple app, optionally within a container. Calendar requires startDate and endDate; alternatively use calendar.list_events.",
       {
         app: appParam,
         containerId: z
@@ -157,10 +158,12 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           .optional()
           .describe("Max items to return (default: 50)"),
         offset: z.number().int().min(0).optional().describe("Offset for pagination (default: 0)"),
+        startDate: timestamp.optional().describe("Calendar only: inclusive range start"),
+        endDate: timestamp.optional().describe("Calendar only: exclusive range end"),
         dryRun: dryRunParam,
       },
       { readOnlyHint: true },
-      async ({ app, containerId, limit, offset, dryRun }) => {
+      async ({ app, containerId, limit, offset, startDate, endDate, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.list", app });
 
@@ -175,7 +178,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
             isError: true;
           };
 
-        const { templateId, parameters } = adapter.list({ containerId, limit, offset });
+        const range = app === "calendar" ? resolveEventRange({ startDate, endDate }) : {};
+        const { templateId, parameters } = adapter.list({ containerId, limit, offset, ...range });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )
@@ -215,7 +219,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
     "app.search",
     server.tool(
       "app.search",
-      "Search for items in an Apple app",
+      "Search for items in an Apple app. Calendar searches event titles and requires startDate and endDate.",
       {
         app: appParam,
         query: z.string().max(500).describe("Search query"),
@@ -225,10 +229,12 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           .optional()
           .describe("Limit search to a specific container"),
         limit: z.number().int().min(1).max(200).optional().describe("Max results (default: 20)"),
+        startDate: timestamp.optional().describe("Calendar only: inclusive range start"),
+        endDate: timestamp.optional().describe("Calendar only: exclusive range end"),
         dryRun: dryRunParam,
       },
       { readOnlyHint: true },
-      async ({ app, query, containerId, limit, dryRun }) => {
+      async ({ app, query, containerId, limit, startDate, endDate, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.search", app });
 
@@ -243,7 +249,8 @@ export function registerCrudTools(deps: CrudToolDeps): void {
             isError: true;
           };
 
-        const { templateId, parameters } = adapter.search({ query, containerId, limit });
+        const range = app === "calendar" ? resolveEventRange({ startDate, endDate }) : {};
+        const { templateId, parameters } = adapter.search({ query, containerId, limit, ...range });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )

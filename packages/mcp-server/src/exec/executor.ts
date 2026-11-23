@@ -4,17 +4,18 @@ import { ExecutorError } from "../util/errors.js";
 import { safeJsonParse } from "../util/json.js";
 import { Logger } from "../util/logging.js";
 import { buildTemplateScript, wrapScript } from "../templates/index.js";
+import { isCalendarOperation, runCalendarBridge } from "./calendar-bridge.js";
 
 export interface ExecutorOptions {
   logger: Logger;
 }
 
 /**
- * Execute an AppleScript via osascript.
+ * Execute a Calendar operation through EventKit or an AppleScript via osascript.
  *
  * For template mode: builds the script from TypeScript templates, wraps with JSON
  * helpers, then executes. For raw mode: executes the script string directly.
- * If dryRun is set, returns the generated script without executing.
+ * If dryRun is set, returns the execution plan without executing.
  */
 export async function runExecutor(
   request: ExecutorRequest,
@@ -22,6 +23,8 @@ export async function runExecutor(
 ): Promise<ExecutorResponse> {
   const { logger } = options;
   const { timeoutMs } = request;
+
+  if (isCalendarOperation(request)) return runCalendarBridge(request);
 
   // Build the AppleScript source
   let script: string;

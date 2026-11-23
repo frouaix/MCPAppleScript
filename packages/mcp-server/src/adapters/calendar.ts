@@ -19,7 +19,7 @@ const calendarPropertiesSchema = z
     notes: z.string().optional(),
     allDay: z.boolean().optional(),
   })
-  .passthrough();
+  .strict();
 
 export class CalendarAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -71,6 +71,9 @@ export class CalendarAdapter implements ResourceAdapter {
         query: params.query,
         calendarId: params.containerId ?? "",
         limit: params.limit ?? 20,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        timeZone: params.timeZone,
       },
     };
   }
@@ -79,7 +82,7 @@ export class CalendarAdapter implements ResourceAdapter {
     return {
       templateId: "calendar.create_event",
       parameters: {
-        calendarName: (params.containerId as string) ?? "Calendar",
+        calendarName: params.containerId ?? "",
         title: params.properties.title ?? "",
         startDate: params.properties.startDate ?? "",
         endDate: params.properties.endDate ?? "",
@@ -94,8 +97,8 @@ export class CalendarAdapter implements ResourceAdapter {
     return {
       templateId: "calendar.update_event",
       parameters: {
-        eventId: params.id,
         ...params.properties,
+        eventId: params.id,
       },
     };
   }

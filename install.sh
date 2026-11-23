@@ -14,6 +14,8 @@ echo ""
 # Check prerequisites
 command -v node >/dev/null 2>&1 || { echo "❌ Node.js is required. Install from https://nodejs.org"; exit 1; }
 command -v pnpm >/dev/null 2>&1 || { echo "❌ pnpm is required. Install with: npm install -g pnpm"; exit 1; }
+command -v swiftc >/dev/null 2>&1 || { echo "❌ swiftc is required. Install Xcode command-line tools."; exit 1; }
+command -v codesign >/dev/null 2>&1 || { echo "❌ codesign is required. Install Xcode command-line tools."; exit 1; }
 
 NODE_VERSION=$(node --version)
 echo "✓ Node.js $NODE_VERSION"
@@ -79,4 +81,5 @@ echo ""
 echo 'Grant app access in the config permissions ceiling before using a profile. See README.md.'
 echo "⚠️  On first use, macOS will prompt for Automation permissions."
 echo "   Go to System Settings → Privacy & Security → Automation to manage."
+echo "   Calendar also requires Calendar Full Access for the Calendar Bridge."
 echo ""

@@ -1,6 +1,6 @@
 # MCP-AppleScript
 
-A local, **stdio-only** MCP server for controlled AppleScript automation on macOS.
+A local, **stdio-only** MCP server for controlled automation on macOS.
 
 > [!CAUTION]
 > This software can read, create, modify, and delete personal data in local apps.
@@ -12,12 +12,13 @@ A local, **stdio-only** MCP server for controlled AppleScript automation on macO
 ## Architecture
 
 ```text
-MCP client -> TypeScript server -> osascript -> macOS apps (Apple Events)
+MCP client -> TypeScript server -> osascript -> macOS apps
+                                -> native EventKit helper -> Calendar
 ```
 
 The server validates requests, enforces immutable per-app permissions, maps operations
-through app adapters, and executes parameterized AppleScript. There is no Swift helper,
-HTTP listener, raw-script tool, or arbitrary-template tool.
+through app adapters, and executes parameterized AppleScript or a Swift EventKit helper
+for Calendar. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
 
 Adapters exist for Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music,
 Finder, and Safari. Support varies by app; not every app implements every CRUD operation.
@@ -25,7 +26,8 @@ Actual app automation depends on macOS scripting support and Automation consent.
 
 ## Installation
 
-For source builds, install Node.js 20+ and pnpm 8+ on macOS:
+For source builds, install Node.js 20+, pnpm 8+, and Xcode command-line tools
+(including `swiftc` and `codesign`) on macOS:
 
 ```bash
 git clone https://github.com/frouaix/MCPAppleScript.git
@@ -39,7 +41,7 @@ edit the permissions ceiling before use. Existing configuration is never overwri
 
 For a standalone executable, download a `.dmg` from
 [GitHub Releases](https://github.com/frouaix/MCPAppleScript/releases) and copy
-`mcp-applescript` to a directory in your PATH. Older releases may still implement the
+`mcp-applescript` and `CalendarBridge.app` together to a directory in your PATH. Older releases may still implement the
 previous permission model; these instructions describe the current source.
 
 ## Permissions and named profiles
@@ -146,12 +148,17 @@ macOS may ask permission for the launching application to control a target app.
 Review **System Settings > Privacy & Security > Automation** if access is denied.
 The exact attribution depends on how the client launches the server.
 
+Calendar operations use EventKit and require a separate **Calendars: Full Access**
+grant to the Calendar Bridge. macOS Full Access permits writes at the OS level;
+the MCP server still enforces the selected profile, but that is not protection
+against an agent with unrestricted shell access. Calendar's `show` action uses AppKit.
+
 Updates, deletions, and actions named `send`, `move`, or `do_javascript` require user
 confirmation through MCP **form elicitation**, in addition to `readwrite`.
 If the client does not support form elicitation, those operations are blocked.
 Declining or cancelling stops the operation; there is no model-echoed token fallback.
 Dry runs still require the appropriate app permission and pass adapter validation,
-but do not request confirmation or execute AppleScript.
+but do not request confirmation or access app data.
 
 Other supported writes (for example creation, reminder completion, and playback)
 are authorized by `readwrite` without an additional confirmation prompt.
@@ -190,9 +197,10 @@ Unsupported adapter operations fail explicitly.
 
 For "what's my schedule tomorrow?", use `calendar.list_events` with `{"day":"tomorrow"}`.
 The Mac resolves local midnight boundaries, filters overlapping events, sorts them
-chronologically, and returns paginated UTC timestamps. **Recurring events are not
-expanded into occurrences: this is not yet a complete recurring agenda.** Results
-and tool guidance disclose this limitation. See [docs/TOOLS.md](docs/TOOLS.md) for
+chronologically, and returns paginated local timestamps with UTC offsets, including
+recurring occurrences. EventKit may expose fewer calendars than Calendar displays;
+compare `calendar.list_calendars` with the app before relying on completeness.
+See [docs/TOOLS.md](docs/TOOLS.md) for
 date ranges, pagination, and Notes examples. Restart the MCP instance after rebuilding
 to refresh the tools advertised to the client.
 

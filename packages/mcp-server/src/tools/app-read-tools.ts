@@ -1,47 +1,15 @@
 import { z } from "zod";
 import { CrudToolDeps, runValidation } from "./crud-tools.js";
-import { McpAppleScriptError } from "../util/errors.js";
+import { resolveEventRange, timestamp } from "./calendar-range.js";
+export { resolveEventRange } from "./calendar-range.js";
 
-const dryRun = z.boolean().optional().describe("Return the script without accessing app data");
+const dryRun = z
+  .boolean()
+  .optional()
+  .describe("Return the execution plan without accessing app data");
 const limit = z.number().int().min(1).max(200).optional().describe("Page size, default 50");
 const offset = z.number().int().min(0).optional().describe("Pagination offset, default 0");
 const id = z.string().min(1).max(500);
-const timestamp = z
-  .string()
-  .datetime({ offset: true, precision: 0 })
-  .describe("ISO 8601 timestamp with Z or an explicit UTC offset, e.g. 2026-11-02T00:00:00-08:00");
-
-export function resolveEventRange(
-  input: { day?: "today" | "tomorrow"; startDate?: string; endDate?: string },
-  now = new Date()
-): { startDate: string; endDate: string; timeZone: string } {
-  let start: Date;
-  let end: Date;
-  if (input.day && input.startDate === undefined && input.endDate === undefined) {
-    start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    if (input.day === "tomorrow") start.setDate(start.getDate() + 1);
-    end = new Date(start);
-    end.setDate(end.getDate() + 1);
-  } else if (!input.day && input.startDate && input.endDate) {
-    start = new Date(input.startDate);
-    end = new Date(input.endDate);
-  } else {
-    throw new McpAppleScriptError(
-      "INVALID_REQUEST",
-      'Provide day ("today" or "tomorrow"), or both startDate and endDate, not both.'
-    );
-  }
-  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
-    throw new McpAppleScriptError("INVALID_REQUEST", "endDate must be later than startDate.");
-  }
-  return {
-    startDate: start.toISOString().replace(".000Z", "Z"),
-    endDate: end.toISOString().replace(".000Z", "Z"),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
-}
-
 export function registerAppReadTools(deps: CrudToolDeps): void {
   const { server, registerTool, policy, appRegistry, executeTemplate, validationContext } = deps;
   function execute(
@@ -64,7 +32,7 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
       "calendar.list_calendars",
       server.tool(
         "calendar.list_calendars",
-        "List local Apple Calendar calendars. Each id is the calendar's name, not a stable identifier; duplicate names cannot be used for selection. Use calendar.list_events to read your schedule, appointments, and meetings.",
+        "List local calendars using EventKit. Returns calendar IDs and names. Use calendar.list_events to read your schedule, appointments, and meetings.",
         { dryRun },
         { readOnlyHint: true },
         (params) =>
@@ -75,7 +43,7 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
       "calendar.list_events",
       server.tool(
         "calendar.list_events",
-        'Read appointments, meetings, and schedule from local Apple Calendar. For "what is my schedule tomorrow?" use day:"tomorrow"; for today use day:"today". Otherwise provide startDate and endDate with UTC offsets. Filters overlapping events across all calendars unless calendarId is given. Returns total, offset, hasMore, timeZone, limitations, and items with id, name, calendarId, calendarName, startDate/endDate (UTC ISO timestamps), location, allDay, and recurrence. Fetch all pages before summarizing; recurrence expansion is not supported.',
+        'Read appointments, meetings, and schedule using EventKit, including recurring occurrences. For "what is my schedule tomorrow?" use day:"tomorrow"; for today use day:"today". Otherwise provide startDate and endDate with UTC offsets, up to three years. Filters overlapping events across all calendars unless calendarId is given. Returns total, offset, hasMore, timeZone, limitations and items with id, name, calendarId, calendarName, startDate/endDate (ISO timestamps in the Mac local time zone with UTC offset), location, allDay, and isRecurring. Fetch all pages before summarizing and disclose any limitations.',
         {
           day: z
             .enum(["today", "tomorrow"])
@@ -89,9 +57,7 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
             .describe("Exclusive end of the range; must follow startDate"),
           calendarId: id
             .optional()
-            .describe(
-              "Calendar name from calendar.list_calendars; omit for all. Duplicate names are ambiguous and cannot be selected."
-            ),
+            .describe("Calendar ID from calendar.list_calendars; omit for all."),
           limit,
           offset,
           dryRun,

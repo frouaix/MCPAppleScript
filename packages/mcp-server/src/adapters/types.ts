@@ -1,8 +1,8 @@
 /**
- * Common abstraction for Apple app resources exposed via AppleScript.
+ * Common abstraction for Apple app resources.
  *
  * Each app implements ResourceAdapter, mapping generic CRUD operations
- * to app-specific AppleScript templates. Apps that support only a subset
+ * to app-specific internal operations. Apps that support only a subset
  * of operations throw UnsupportedOperationError for the rest.
  */
 
@@ -98,6 +98,9 @@ export interface SearchParams {
   query: string;
   containerId?: string;
   limit?: number;
+  startDate?: string;
+  endDate?: string;
+  timeZone?: string;
 }
 
 /** Parameters for the create operation. */
