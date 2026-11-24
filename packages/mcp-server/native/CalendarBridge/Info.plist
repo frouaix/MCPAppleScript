@@ -20,5 +20,7 @@
     <string>Read or modify reminders as requested through the MCP server.</string>
     <key>NSRemindersUsageDescription</key>
     <string>Read or modify reminders as requested through the MCP server.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Read or modify contacts as requested through the MCP server.</string>
 </dict>
 </plist>

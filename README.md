@@ -13,12 +13,12 @@ A local, **stdio-only** MCP server for controlled automation on macOS.
 
 ```text
 MCP client -> TypeScript server -> osascript -> macOS apps
-                                -> native EventKit helper -> Calendar / Reminders
+                                -> native helper -> Calendar / Reminders / Contacts
 ```
 
 The server validates requests, enforces immutable per-app permissions, maps operations
-through app adapters, and executes parameterized AppleScript or a Swift EventKit helper
-for Calendar and Reminders. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
+through app adapters, and executes parameterized AppleScript or a Swift native helper.
+There is no HTTP listener, raw-script tool, or arbitrary-template tool.
 
 Adapters exist for Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music,
 Finder, and Safari. Support varies by app; not every app implements every CRUD operation.
@@ -65,6 +65,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
       "notes": "readwrite",
       "calendar": "readwrite",
       "reminders": "read",
+      "contacts": "read",
       "mail": "read"
     }
   },
@@ -74,6 +75,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
         "notes": "read",
         "calendar": "read",
         "reminders": "read",
+        "contacts": "read",
         "mail": "read"
       }
     },
@@ -94,7 +96,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
 }
 ```
 
-Use the short app names shown above and `contacts`, `messages`, `photos`,
+Use the short app names shown above and `messages`, `photos`,
 `music`, `finder`, `safari` -- not bundle IDs. Unknown app names and invalid permissions
 are rejected.
 
@@ -153,6 +155,8 @@ The exact attribution depends on how the client launches the server.
 Calendar and Reminders use EventKit and require separate macOS **Full Access** grants.
 The attributed app depends on the launcher; for example, macOS may prompt for iTerm.
 Full Access permits writes at the OS level even with an MCP read-only profile.
+Contacts uses the Contacts framework and a separate macOS Contacts grant, which also
+allows writes at the OS level.
 
 Updates, deletions, and actions named `send`, `move`, or `do_javascript` require user
 confirmation through MCP **form elicitation**, in addition to `readwrite`.
@@ -185,6 +189,7 @@ been removed because they do not fit scoped stdio access.
 | `calendar.list_calendars`, `calendar.list_events` | Calendar `read`; calendars and date-filtered schedules |
 | `notes.list_folders`, `notes.list_notes`, `notes.search_notes`, `notes.get_note` | Notes `read`; browse, search titles/body, read content |
 | `reminders.list_due` | Reminders `read`; incomplete reminders due today or tomorrow |
+| `contacts.search`, `contacts.get` | Contacts `read`; find people and read contact details |
 | `app.list_containers`, `app.list`, `app.get`, `app.search` | `read` |
 | `app.create`, `app.update`, `app.delete` | `readwrite` |
 | `app.action` | `readwrite`, except Music `now_playing` requires `read` |

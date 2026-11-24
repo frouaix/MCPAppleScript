@@ -9,6 +9,7 @@ import {
   CalendarAdapter,
   NotesAdapter,
   RemindersAdapter,
+  ContactsAdapter,
 } from "../../src/adapters/index.js";
 import { ConfigSchema } from "../../src/config/schema.js";
 import { PolicyEngine } from "../../src/policy/policy.js";
@@ -97,6 +98,7 @@ describe("App-specific read dispatch", () => {
     appRegistry.register(new NotesAdapter());
     appRegistry.register(new CalendarAdapter());
     appRegistry.register(new RemindersAdapter());
+    appRegistry.register(new ContactsAdapter());
     const calls: Array<{
       templateId: string;
       bundleId: string;
@@ -108,7 +110,9 @@ describe("App-specific read dispatch", () => {
       appRegistry,
       policy: new PolicyEngine(
         ConfigSchema.parse({
-          permissions: { apps: { notes: "read", calendar: "read", reminders: "read" } },
+          permissions: {
+            apps: { notes: "read", calendar: "read", reminders: "read", contacts: "read" },
+          },
         }),
         new Logger({ level: "error", redact: [] })
       ),
@@ -167,6 +171,21 @@ describe("App-specific read dispatch", () => {
         calls.at(-1)?.parameters.startDate,
         resolveEventRange({ day: "today" }).startDate
       );
+      const search = await client.callTool({
+        name: "contacts.search",
+        arguments: { query: "Example", groupId: "group", limit: 5, offset: 2 },
+      });
+      assert.ok(!search.isError);
+      assert.equal(calls.at(-1)?.templateId, "contacts.search_people");
+      assert.equal(calls.at(-1)?.parameters.groupId, "group");
+      assert.equal(calls.at(-1)?.parameters.offset, 2);
+      const contact = await client.callTool({
+        name: "contacts.get",
+        arguments: { contactId: "fixture" },
+      });
+      assert.ok(!contact.isError);
+      assert.equal(calls.at(-1)?.templateId, "contacts.get_person");
+      assert.equal(calls.at(-1)?.parameters.personId, "fixture");
     } finally {
       await client.close();
       await server.close();

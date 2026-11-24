@@ -7,7 +7,6 @@ export { esc, wrapScript, jsonEscHandlers } from "./escape.js";
 
 import * as notes from "./notes.js";
 import * as mail from "./mail.js";
-import * as contacts from "./contacts.js";
 import * as messages from "./messages.js";
 import * as photos from "./photos.js";
 import * as music from "./music.js";
@@ -17,7 +16,6 @@ import * as safari from "./safari.js";
 const builders: Record<string, typeof notes> = {
   notes,
   mail,
-  contacts,
   messages,
   photos,
   music,

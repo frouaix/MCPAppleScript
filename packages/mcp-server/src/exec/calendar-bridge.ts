@@ -23,6 +23,14 @@ const operations = new Set([
   "reminders.delete_reminder",
   "reminders.complete",
   "reminders.show",
+  "contacts.list_groups",
+  "contacts.list_people",
+  "contacts.get_person",
+  "contacts.search_people",
+  "contacts.create_person",
+  "contacts.update_person",
+  "contacts.delete_person",
+  "contacts.show",
 ]);
 
 export function isCalendarOperation(request: ExecutorRequest): boolean {
@@ -31,7 +39,8 @@ export function isCalendarOperation(request: ExecutorRequest): boolean {
     request.templateId !== undefined &&
     operations.has(request.templateId) &&
     ((request.bundleId === "com.apple.iCal" && request.templateId.startsWith("calendar.")) ||
-      (request.bundleId === "com.apple.reminders" && request.templateId.startsWith("reminders.")))
+      (request.bundleId === "com.apple.reminders" && request.templateId.startsWith("reminders.")) ||
+      (request.bundleId === "com.apple.Contacts" && request.templateId.startsWith("contacts.")))
   );
 }
 
@@ -41,7 +50,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
     return {
       requestId: request.requestId,
       ok: false,
-      error: { code: "INVALID_REQUEST", message: "Unsupported Calendar operation." },
+      error: { code: "INVALID_REQUEST", message: "Unsupported native operation." },
     };
   }
   const parameters = { ...request.parameters, operation };
@@ -49,7 +58,10 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
     return {
       requestId: request.requestId,
       ok: true,
-      result: { backend: "EventKit", ...parameters },
+      result: {
+        backend: operation.startsWith("contacts.") ? "Contacts" : "EventKit",
+        ...parameters,
+      },
       stdout: "",
       stderr: "",
     };
@@ -77,7 +89,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
             error: {
               code: timedOut ? "TIMEOUT" : "EXECUTOR_FAILED",
               message: timedOut
-                ? `Calendar operation timed out after ${request.timeoutMs}ms`
+                ? `Native operation timed out after ${request.timeoutMs}ms`
                 : stderr.trim() || `Could not run Calendar Bridge: ${error.message}`,
             },
           });
