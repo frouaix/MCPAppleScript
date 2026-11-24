@@ -42,6 +42,11 @@ struct CalendarBridgeTests {
         precondition(allDay.year == 2026 && allDay.month == 11 && allDay.day == 24 && allDay.hour == nil)
         let timed = try reminderDueDate("2026-11-24T10:30:00-08:00")
         precondition(timed.date == formatter.date(from: "2026-11-24T18:30:00Z"))
+        precondition(TimeZone.current.secondsFromGMT(for: formatter.date(from: "2026-11-01T08:30:00Z")!) == -7 * 3600)
+        let firstFallHour = try reminderDueDate("2026-11-01T01:30:00-07:00")
+        let secondFallHour = try reminderDueDate("2026-11-01T01:30:00-08:00")
+        precondition(firstFallHour.date == formatter.date(from: "2026-11-01T08:30:00Z"))
+        precondition(secondFallHour.date == formatter.date(from: "2026-11-01T09:30:00Z"))
         var localCalendar = Calendar(identifier: .gregorian)
         localCalendar.timeZone = .current
         let dayStart = localCalendar.startOfDay(for: try reminderDueInstant(allDay)!)

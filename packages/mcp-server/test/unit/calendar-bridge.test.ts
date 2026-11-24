@@ -164,7 +164,10 @@ describe("EventKit dispatch", () => {
           ],
           { timeout: 60000 }
         );
-        execFileSync(binary, [], { timeout: 10000 });
+        execFileSync(binary, [], {
+          timeout: 10000,
+          env: { ...process.env, TZ: "America/Los_Angeles" },
+        });
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }

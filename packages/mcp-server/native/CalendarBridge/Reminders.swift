@@ -22,6 +22,7 @@ func reminderDueDate(_ text: String) throws -> DateComponents {
         return components
     }
     let date = try parseDate(text, field: "dueDate")
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     var components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
     components.calendar = calendar
     components.timeZone = calendar.timeZone
