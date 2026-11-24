@@ -29,6 +29,7 @@ let contactSummaryKeys: [CNKeyDescriptor] = [
     CNContactOrganizationNameKey as CNKeyDescriptor,
 ]
 let contactDetailKeys = contactSummaryKeys + [
+    CNContactMiddleNameKey as CNKeyDescriptor,
     CNContactJobTitleKey as CNKeyDescriptor,
     CNContactEmailAddressesKey as CNKeyDescriptor,
     CNContactPhoneNumbersKey as CNKeyDescriptor,
@@ -40,7 +41,9 @@ func contactName(_ contact: CNContact) -> String {
 }
 
 func contactMatchesQuery(_ contact: CNContact, query: String) -> Bool {
-    let values = [contactName(contact), contact.organizationName] +
+    let fullName = [contact.givenName, contact.middleName, contact.familyName]
+        .filter { !$0.isEmpty }.joined(separator: " ")
+    let values = [contactName(contact), fullName, contact.organizationName] +
         contact.emailAddresses.map { $0.value as String } +
         contact.phoneNumbers.map { $0.value.stringValue }
     return values.contains { $0.localizedCaseInsensitiveContains(query) }

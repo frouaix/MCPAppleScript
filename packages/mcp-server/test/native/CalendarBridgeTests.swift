@@ -86,7 +86,11 @@ struct CalendarBridgeTests {
         try validateContactsRequest(contactRequest)
         let contact = CNMutableContact()
         applyContactChanges(contactRequest, to: contact)
+        contact.middleName = "Middle"
         precondition(contactMatchesQuery(contact, query: "EXAMPLE"))
+        precondition(contactMatchesQuery(contact, query: "middle"))
+        precondition(contactMatchesQuery(contact, query: "Example Middle Person"))
+        precondition(contactMatchesQuery(contact, query: "Example Person"))
         precondition(contactMatchesQuery(contact, query: "two@example"))
         precondition(contactMatchesQuery(contact, query: "123"))
         precondition(!contactMatchesQuery(contact, query: "not-present"))
