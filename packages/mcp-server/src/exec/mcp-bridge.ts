@@ -31,20 +31,28 @@ const operations = new Set([
   "contacts.update_person",
   "contacts.delete_person",
   "contacts.show",
+  "photos.list_albums",
+  "photos.list_items",
+  "photos.get_item",
+  "photos.search_items",
+  "photos.create_album",
+  "photos.import",
+  "photos.show",
 ]);
 
-export function isCalendarOperation(request: ExecutorRequest): boolean {
+export function isNativeOperation(request: ExecutorRequest): boolean {
   return (
     request.mode === "template" &&
     request.templateId !== undefined &&
     operations.has(request.templateId) &&
     ((request.bundleId === "com.apple.iCal" && request.templateId.startsWith("calendar.")) ||
       (request.bundleId === "com.apple.reminders" && request.templateId.startsWith("reminders.")) ||
-      (request.bundleId === "com.apple.Contacts" && request.templateId.startsWith("contacts.")))
+      (request.bundleId === "com.apple.Contacts" && request.templateId.startsWith("contacts.")) ||
+      (request.bundleId === "com.apple.Photos" && request.templateId.startsWith("photos.")))
   );
 }
 
-export async function runCalendarBridge(request: ExecutorRequest): Promise<ExecutorResponse> {
+export async function runMCPBridge(request: ExecutorRequest): Promise<ExecutorResponse> {
   const operation = request.templateId;
   if (!operation || !operations.has(operation)) {
     return {
@@ -59,7 +67,11 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
       requestId: request.requestId,
       ok: true,
       result: {
-        backend: operation.startsWith("contacts.") ? "Contacts" : "EventKit",
+        backend: operation.startsWith("contacts.")
+          ? "Contacts"
+          : operation.startsWith("photos.")
+            ? "PhotoKit"
+            : "EventKit",
         ...parameters,
       },
       stdout: "",
@@ -69,7 +81,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
   const appRoot = isSea()
     ? dirname(process.execPath)
     : fileURLToPath(new URL("../../dist", import.meta.url));
-  const executable = join(appRoot, "CalendarBridge.app", "Contents", "MacOS", "CalendarBridge");
+  const executable = join(appRoot, "MCPBridge.app", "Contents", "MacOS", "MCPBridge");
 
   return new Promise((resolve) => {
     const child = execFile(
@@ -90,7 +102,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
               code: timedOut ? "TIMEOUT" : "EXECUTOR_FAILED",
               message: timedOut
                 ? `Native operation timed out after ${request.timeoutMs}ms`
-                : stderr.trim() || `Could not run Calendar Bridge: ${error.message}`,
+                : stderr.trim() || `Could not run MCPBridge: ${error.message}`,
             },
           });
           return;
@@ -110,7 +122,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
           resolve({
             requestId: request.requestId,
             ok: false,
-            error: { code: "EXECUTOR_FAILED", message: "Calendar Bridge returned invalid JSON." },
+            error: { code: "EXECUTOR_FAILED", message: "MCPBridge returned invalid JSON." },
           });
         }
       }
@@ -123,7 +135,7 @@ export async function runCalendarBridge(request: ExecutorRequest): Promise<Execu
           ok: false,
           error: {
             code: "EXECUTOR_FAILED",
-            message: `Calendar Bridge input failed: ${error.message}`,
+            message: `MCPBridge input failed: ${error.message}`,
           },
         });
       }

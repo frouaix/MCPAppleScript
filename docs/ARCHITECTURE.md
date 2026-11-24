@@ -2,7 +2,7 @@
 
 MCP-AppleScript is a local stdio MCP server. A TypeScript process executes parameterized
 AppleScript through `child_process.execFile("osascript", ["-e", script])` without a shell.
-Calendar and Reminders use EventKit; Contacts uses the Contacts framework. A bundled
+Calendar and Reminders use EventKit; Contacts uses the Contacts framework; Photos uses PhotoKit. A bundled
 Swift helper provides these APIs and uses AppKit to open the apps.
 There is no HTTP transport.
 
@@ -16,7 +16,7 @@ Trusted host selects --profile NAME
   -> adapter validation (Finder paths / Safari JavaScript)
   -> ResourceAdapter maps to an internal template
   -> user confirmation when required
-  -> Calendar, Reminders, Contacts: helper over JSON stdin -> native frameworks
+  -> Calendar, Reminders, Contacts, Photos: helper over JSON stdin -> native frameworks
      Other apps: template -> osascript -> Apple Events
   -> JSON result or error returned
 ```
@@ -36,11 +36,11 @@ The host must restrict which instance a conversation can use. Profiles do not sa
 an agent with unrestricted shell access as the same macOS user. macOS TCC/Automation
 consent is a separate enforcement layer, not a read/write permission system.
 EventKit requires separate macOS Calendars and Reminders Full Access grants, which allow writes at the OS level;
-Contacts has its own access grant that also permits writes. The server's profile
+Contacts and Photos have separate grants that also permit writes. The server's profile
 independently enforces read versus readwrite.
 
 Tool visibility and generic app enums reflect effective grants; every call is still
-checked. Calendar, Notes, Reminders, and Contacts expose task-specific reads.
+checked. Calendar, Notes, Reminders, Contacts, and Photos expose task-specific reads.
 Initialization instructions describe workflows and limitations for enabled apps.
 Music `now_playing` is the
 only read-only app action; other actions require `readwrite`. Updates, deletions, and
@@ -65,7 +65,7 @@ against concurrent filesystem changes by other local processes.
 | `mode/confirmation.ts` | User confirmation via form elicitation only |
 | `adapters/` | ResourceAdapter implementations and app-specific validation |
 | `templates/` | Internal parameterized AppleScript builders and escaping |
-| `exec/` | osascript and EventKit helper invocation, timeouts and errors |
+| `exec/` | osascript and native helper invocation, timeouts and errors |
 | `util/` | Typed errors, JSON utilities, stderr logging |
 
 `ResourceAdapter` maps generic operations to `{ templateId, parameters }`.

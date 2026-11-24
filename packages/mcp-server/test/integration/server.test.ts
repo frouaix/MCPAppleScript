@@ -41,12 +41,37 @@ describe("MCP stdio profile isolation", () => {
           private: { apps: { notes: "read", calendar: "read" } },
           remindersRead: { apps: { reminders: "read" } },
           contactsRead: { apps: { contacts: "read" } },
+          photosRead: { apps: { photos: "read" } },
           disabled: {},
           organizer: { default: "readwrite" },
         },
         logging: { level: "error" },
       })
     );
+  });
+
+  it("exposes PhotoKit reads without granting writes", async () => {
+    const client = await connect("photosRead");
+    const { tools } = await client.listTools();
+    assert.ok(tools.some((tool) => tool.name === "photos.list_recent"));
+    assert.ok(!tools.some((tool) => tool.name === "app.create"));
+    const result = await client.callTool({
+      name: "photos.list_recent",
+      arguments: { limit: 5, dryRun: true },
+    });
+    assert.ok(!result.isError);
+    assert.match(JSON.stringify(result.content), /PhotoKit/);
+    const search = await client.callTool({
+      name: "app.search",
+      arguments: { app: "photos", query: "fixture", offset: 2, dryRun: true },
+    });
+    assert.ok(!search.isError);
+    assert.match(JSON.stringify(search.content), /PhotoKit/);
+    const denied = await client.callTool({
+      name: "app.create",
+      arguments: { app: "photos", properties: { name: "fixture" }, dryRun: true },
+    });
+    assert.equal(denied.isError, true);
   });
 
   it("advertises only system tools when all apps are off", async () => {

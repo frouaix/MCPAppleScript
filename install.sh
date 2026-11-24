@@ -82,5 +82,5 @@ echo ""
 echo 'Grant app access in the config permissions ceiling before using a profile. See README.md.'
 echo "⚠️  On first use, macOS will prompt for Automation permissions."
 echo "   Go to System Settings → Privacy & Security → Automation to manage."
-echo "   Calendar also requires Calendar Full Access for the Calendar Bridge."
+echo "   Calendar also requires Calendar Full Access for MCPBridge."
 echo ""

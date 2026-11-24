@@ -13,7 +13,7 @@ See [configuration and profile examples](../README.md#permissions-and-named-prof
 | `app.list_containers` | `read` | None |
 | `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset`; Calendar requires `startDate` and `endDate` |
 | `app.get` | `read` | `id` |
-| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate`; Calendar, Reminders, and Contacts accept `offset` |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate`; Calendar, Reminders, Contacts, and Photos accept `offset` |
 | `app.create` | `readwrite` | `properties`, optional `containerId` |
 | `app.update` | `readwrite` + confirmation | `id`, `properties` |
 | `app.delete` | `readwrite` + confirmation | `id` |
@@ -30,7 +30,7 @@ explicitly. `app.action` is absent unless an app is readwrite or Music is readab
 With every app off, only the two `applescript.*` inspection tools remain.
 Authorization is enforced on every invocation, not merely through tool visibility.
 A dry run still requires the same permission and adapter
-validation, but returns the generated script or EventKit execution plan without
+validation, but returns the generated script or native execution plan without
 executing or confirming it.
 
 There are no raw-script, arbitrary-template, or permission-changing tools.
@@ -53,6 +53,7 @@ the generic operations' policy checks, adapters, validation, and executor. They 
 | `reminders.list_due` | Optional `day: "today" \| "tomorrow"` (default today), `listId`, `limit`, `offset` | Incomplete reminders due on the selected local day, ordered by due date |
 | `contacts.search` | `query`; optional `groupId`, `limit`, `offset` | Matching contact IDs and names |
 | `contacts.get` | `contactId` from search | Contact details |
+| `photos.list_recent` | Optional `albumId`, `limit`, `offset` | Recent photo and video metadata |
 
 List page size defaults to 50; Notes search defaults to 20. Both accept 1-200.
 List offsets start at 0. Notes search returns a limited array, not a complete paginated
@@ -103,7 +104,7 @@ EventKit may expose fewer calendars than the Calendar app; compare
 Updates and deletions affect the selected occurrence, not future occurrences.
 Calendar `app.search` matches event titles in the required date range and returns
 the same paginated shape; advance its `offset` by the returned item count while
-`hasMore` is true. Searches outside Calendar, Reminders, and Contacts are unpaginated.
+`hasMore` is true. Searches outside Calendar, Reminders, Contacts, and Photos are unpaginated.
 Calendar `app.get` retains `properties.startDate`, `properties.endDate`,
 `properties.location`, `properties.allDay`, and `properties.description` alongside
 the top-level event fields. Calendar creation takes a Calendar ID as `containerId`
@@ -140,6 +141,23 @@ Create/update accept `firstName`, `lastName`, `organization`, `jobTitle`, `email
 replaces that entire array. Create requires a name or organization; optional `containerId`
 is a group ID from `app.list_containers`.
 
+### Photos
+
+Photos uses PhotoKit and its own macOS Photos grant, which permits OS-level writes
+even for an MCP read-only profile. Limited access restricts visible results. List and
+search return `total`, `offset`, `hasMore`, `limitedAccess`, and `items`, newest first.
+Each item has an ID, filename, date, dimensions, favorite status, and media type.
+Only regular albums are listed; smart and shared albums may not appear.
+Hidden items and some burst photos are excluded by PhotoKit's default fetch options.
+PhotoKit identifiers may differ from AppleScript IDs; list again after upgrading.
+
+`photos.list_recent` accepts `{"limit":5}` for recent photo/video metadata; it does not
+retrieve image contents. Generic `app.search` matches captions and requires macOS 27
+and a helper built with the macOS 27 SDK. Captions are unavailable on older systems;
+search scans the accessible library and can take time.
+`app.create` creates an album with `{"name":"..."}`. The `import` action accepts an
+absolute `filePath` and optional `albumId`; it supports image and video files.
+
 Initialization instructions describe enabled apps and suggested workflows; tool
 descriptions and schemas provide the same discovery hints for clients that ignore
 instructions. App content is untrusted data, not agent instructions.
@@ -171,7 +189,7 @@ supports it. Bundle IDs are internal; configuration and tool inputs use short na
 4. The adapter maps to a known template.
 5. Updates, deletions, and `send`/`move`/`do_javascript` actions require MCP form
    elicitation. Missing support, rejection, or cancellation prevents execution.
-6. Calendar, Reminders, and Contacts use the native helper; other apps use
+6. Calendar, Reminders, Contacts, and Photos use the native helper; other apps use
    parameterized AppleScript via `osascript`. Each has an execution timeout.
 7. macOS independently enforces app access or Automation consent.
 

@@ -4,7 +4,7 @@ import { ExecutorError } from "../util/errors.js";
 import { safeJsonParse } from "../util/json.js";
 import { Logger } from "../util/logging.js";
 import { buildTemplateScript, wrapScript } from "../templates/index.js";
-import { isCalendarOperation, runCalendarBridge } from "./calendar-bridge.js";
+import { isNativeOperation, runMCPBridge } from "./mcp-bridge.js";
 
 export interface ExecutorOptions {
   logger: Logger;
@@ -24,7 +24,7 @@ export async function runExecutor(
   const { logger } = options;
   const { timeoutMs } = request;
 
-  if (isCalendarOperation(request)) return runCalendarBridge(request);
+  if (isNativeOperation(request)) return runMCPBridge(request);
 
   // Build the AppleScript source
   let script: string;

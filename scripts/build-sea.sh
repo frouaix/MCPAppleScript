@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build a macOS Node.js SEA binary and its Calendar helper.
+# Build a macOS Node.js SEA binary and its native helper.
 #
 # Usage:
 #   ./scripts/build-sea.sh
@@ -27,10 +27,10 @@ BUNDLE_CJS="$DIST_DIR/bundle.cjs"
 echo "==> Preparing dist directory"
 mkdir -p "$DIST_DIR"
 
-echo "==> Building Calendar EventKit helper"
+echo "==> Building MCPBridge"
 cd "$MCP_PKG"
 pnpm build
-ditto "$MCP_PKG/dist/CalendarBridge.app" "$DIST_DIR/CalendarBridge.app"
+ditto "$MCP_PKG/dist/MCPBridge.app" "$DIST_DIR/MCPBridge.app"
 
 # Step 1: Bundle TypeScript → CJS with esbuild
 echo "==> Bundling TypeScript with esbuild"

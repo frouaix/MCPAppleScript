@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>CalendarBridge</string>
+    <string>MCPBridge</string>
     <key>CFBundleIdentifier</key>
     <string>com.mcp-applescript.calendar-bridge</string>
     <key>CFBundleName</key>
-    <string>MCP AppleScript Calendar Bridge</string>
+    <string>MCPBridge</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
@@ -22,5 +22,7 @@
     <string>Read or modify reminders as requested through the MCP server.</string>
     <key>NSContactsUsageDescription</key>
     <string>Read or modify contacts as requested through the MCP server.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Read or modify the photo library as requested through the MCP server.</string>
 </dict>
 </plist>

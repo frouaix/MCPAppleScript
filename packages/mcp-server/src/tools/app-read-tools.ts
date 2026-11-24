@@ -13,7 +13,7 @@ const id = z.string().min(1).max(500);
 export function registerAppReadTools(deps: CrudToolDeps): void {
   const { server, registerTool, policy, appRegistry, executeTemplate, validationContext } = deps;
   function execute(
-    app: "calendar" | "notes" | "reminders" | "contacts",
+    app: "calendar" | "notes" | "reminders" | "contacts" | "photos",
     operation: string,
     params: Record<string, unknown>,
     mapped: () => { templateId: string; parameters: Record<string, unknown> }
@@ -24,6 +24,27 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
     if (error) return Promise.resolve(error);
     const { templateId, parameters } = mapped();
     return executeTemplate(templateId, adapter.info.bundleId, parameters, params.dryRun === true);
+  }
+
+  if (policy.getPermissions().photos !== "off") {
+    const adapter = appRegistry.getOrThrow("photos");
+    registerTool(
+      "photos.list_recent",
+      server.tool(
+        "photos.list_recent",
+        "List photo and video metadata, newest first. Returns IDs, filenames, dates, dimensions, and pagination; no image contents. Limited Photos access may restrict results.",
+        { albumId: id.optional(), limit, offset, dryRun },
+        { readOnlyHint: true },
+        (params) =>
+          execute("photos", "app.list", params, () =>
+            adapter.list({
+              containerId: params.albumId,
+              limit: params.limit,
+              offset: params.offset,
+            })
+          )
+      )
+    );
   }
 
   if (policy.getPermissions().contacts !== "off") {

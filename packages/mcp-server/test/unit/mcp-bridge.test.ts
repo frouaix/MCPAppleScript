@@ -12,10 +12,36 @@ import { CalendarAdapter } from "../../src/adapters/calendar.js";
 
 const logger = new Logger({ level: "error", redact: [] });
 const helper = fileURLToPath(
-  new URL("../../dist/CalendarBridge.app/Contents/MacOS/CalendarBridge", import.meta.url)
+  new URL("../../dist/MCPBridge.app/Contents/MacOS/MCPBridge", import.meta.url)
 );
 
 describe("EventKit dispatch", () => {
+  for (const operation of [
+    "list_albums",
+    "list_items",
+    "get_item",
+    "search_items",
+    "create_album",
+    "import",
+    "show",
+  ]) {
+    it(`plans photos.${operation} without accessing Photos`, async () => {
+      const response = await runExecutor(
+        {
+          requestId: "test",
+          bundleId: "com.apple.Photos",
+          mode: "template",
+          templateId: `photos.${operation}`,
+          parameters: {},
+          timeoutMs: 10000,
+          dryRun: true,
+        },
+        { logger }
+      );
+      assert.ok(response.ok);
+      assert.equal(response.result.backend, "PhotoKit");
+    });
+  }
   for (const operation of [
     "list_groups",
     "list_people",
@@ -196,6 +222,31 @@ describe("EventKit dispatch", () => {
   );
 
   it(
+    "rejects invalid Photos requests before requesting access",
+    { skip: process.platform !== "darwin" || !existsSync(helper) },
+    async () => {
+      for (const [templateId, parameters, message] of [
+        ["photos.get_item", {}, /Photo ID is required/],
+        ["photos.import", { filePath: "relative.jpg" }, /absolute/],
+      ] as const) {
+        const response = await runExecutor(
+          {
+            requestId: "test",
+            bundleId: "com.apple.Photos",
+            mode: "template",
+            templateId,
+            parameters,
+            timeoutMs: 10000,
+          },
+          { logger }
+        );
+        assert.equal(response.ok, false);
+        if (!response.ok) assert.match(response.error.message, message);
+      }
+    }
+  );
+
+  it(
     "preserves occurrence IDs and formats local times across daylight saving",
     {
       skip: process.platform !== "darwin",
@@ -209,11 +260,12 @@ describe("EventKit dispatch", () => {
           [
             "-parse-as-library",
             "-D",
-            "CALENDAR_BRIDGE_TEST",
-            fileURLToPath(new URL("../../native/CalendarBridge/main.swift", import.meta.url)),
-            fileURLToPath(new URL("../../native/CalendarBridge/Reminders.swift", import.meta.url)),
-            fileURLToPath(new URL("../../native/CalendarBridge/Contacts.swift", import.meta.url)),
-            fileURLToPath(new URL("../native/CalendarBridgeTests.swift", import.meta.url)),
+            "MCP_BRIDGE_TEST",
+            fileURLToPath(new URL("../../native/MCPBridge/main.swift", import.meta.url)),
+            fileURLToPath(new URL("../../native/MCPBridge/Reminders.swift", import.meta.url)),
+            fileURLToPath(new URL("../../native/MCPBridge/Contacts.swift", import.meta.url)),
+            fileURLToPath(new URL("../../native/MCPBridge/Photos.swift", import.meta.url)),
+            fileURLToPath(new URL("../native/MCPBridgeTests.swift", import.meta.url)),
             "-o",
             binary,
           ],

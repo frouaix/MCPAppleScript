@@ -13,7 +13,7 @@ A local, **stdio-only** MCP server for controlled automation on macOS.
 
 ```text
 MCP client -> TypeScript server -> osascript -> macOS apps
-                                -> native helper -> Calendar / Reminders / Contacts
+                                -> native helper -> Calendar / Reminders / Contacts / Photos
 ```
 
 The server validates requests, enforces immutable per-app permissions, maps operations
@@ -41,8 +41,9 @@ edit the permissions ceiling before use. Existing configuration is never overwri
 
 For a standalone executable, download a `.dmg` from
 [GitHub Releases](https://github.com/frouaix/MCPAppleScript/releases) and copy
-`mcp-applescript` and `CalendarBridge.app` together to a directory in your PATH. Older releases may still implement the
+`mcp-applescript` and `MCPBridge.app` together to a directory in your PATH. Older releases may still implement the
 previous permission model; these instructions describe the current source.
+When upgrading, replace both the executable and helper. macOS may request access again.
 
 ## Permissions and named profiles
 
@@ -156,7 +157,11 @@ Calendar and Reminders use EventKit and require separate macOS **Full Access** g
 The attributed app depends on the launcher; for example, macOS may prompt for iTerm.
 Full Access permits writes at the OS level even with an MCP read-only profile.
 Contacts uses the Contacts framework and a separate macOS Contacts grant, which also
-allows writes at the OS level.
+allows writes at the OS level. Photos uses PhotoKit and requires a separate Photos
+grant; PhotoKit read/write access permits OS-level writes even for an MCP read-only
+profile. Limited Photos access restricts the visible library.
+When macOS attributes a native grant to the launcher (such as iTerm), other processes
+it launches may also use that grant without the MCP server's permission checks.
 
 Updates, deletions, and actions named `send`, `move`, or `do_javascript` require user
 confirmation through MCP **form elicitation**, in addition to `readwrite`.
@@ -190,6 +195,7 @@ been removed because they do not fit scoped stdio access.
 | `notes.list_folders`, `notes.list_notes`, `notes.search_notes`, `notes.get_note` | Notes `read`; browse, search titles/body, read content |
 | `reminders.list_due` | Reminders `read`; incomplete reminders due today or tomorrow |
 | `contacts.search`, `contacts.get` | Contacts `read`; find people and read contact details |
+| `photos.list_recent` | Photos `read`; recent photo and video metadata |
 | `app.list_containers`, `app.list`, `app.get`, `app.search` | `read` |
 | `app.create`, `app.update`, `app.delete` | `readwrite` |
 | `app.action` | `readwrite`, except Music `now_playing` requires `read` |
@@ -209,6 +215,7 @@ recurring occurrences. EventKit may expose fewer calendars than Calendar display
 compare `calendar.list_calendars` with the app before relying on completeness.
 For five incomplete reminders due today, use `reminders.list_due` with
 `{"day":"today","limit":5}`. See [docs/TOOLS.md](docs/TOOLS.md) for details.
+For five recent photos or videos, use `photos.list_recent` with `{"limit":5}`.
 Restart the MCP instance after rebuilding to refresh its tools.
 
 ## Development
