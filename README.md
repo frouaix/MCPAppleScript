@@ -13,16 +13,16 @@ A local, **stdio-only** MCP server for controlled automation on macOS.
 
 ```text
 MCP client -> TypeScript server -> osascript -> macOS apps
-                                -> native EventKit helper -> Calendar
+                                -> native EventKit helper -> Calendar / Reminders
 ```
 
 The server validates requests, enforces immutable per-app permissions, maps operations
 through app adapters, and executes parameterized AppleScript or a Swift EventKit helper
-for Calendar. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
+for Calendar and Reminders. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
 
 Adapters exist for Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music,
 Finder, and Safari. Support varies by app; not every app implements every CRUD operation.
-Actual app automation depends on macOS scripting support and Automation consent.
+AppleScript automation depends on macOS scripting support and Automation consent.
 
 ## Installation
 
@@ -183,6 +183,7 @@ been removed because they do not fit scoped stdio access.
 | `applescript.get_permissions` | None; effective grants and selected profile |
 | `calendar.list_calendars`, `calendar.list_events` | Calendar `read`; calendars and date-filtered schedules |
 | `notes.list_folders`, `notes.list_notes`, `notes.search_notes`, `notes.get_note` | Notes `read`; browse, search titles/body, read content |
+| `reminders.list_due` | Reminders `read`; incomplete reminders due today or tomorrow |
 | `app.list_containers`, `app.list`, `app.get`, `app.search` | `read` |
 | `app.create`, `app.update`, `app.delete` | `readwrite` |
 | `app.action` | `readwrite`, except Music `now_playing` requires `read` |
@@ -200,6 +201,8 @@ The Mac resolves local midnight boundaries, filters overlapping events, sorts th
 chronologically, and returns paginated local timestamps with UTC offsets, including
 recurring occurrences. EventKit may expose fewer calendars than Calendar displays;
 compare `calendar.list_calendars` with the app before relying on completeness.
+Reminders also use EventKit and require a separate macOS Reminders Full Access grant;
+MCP read-only profiles remain enforced by the server, not by that OS grant.
 See [docs/TOOLS.md](docs/TOOLS.md) for
 date ranges, pagination, and Notes examples. Restart the MCP instance after rebuilding
 to refresh the tools advertised to the client.

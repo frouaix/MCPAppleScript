@@ -13,14 +13,25 @@ const operations = new Set([
   "calendar.update_event",
   "calendar.delete_event",
   "calendar.show",
+  "reminders.list_lists",
+  "reminders.list_reminders",
+  "reminders.list_due",
+  "reminders.get_reminder",
+  "reminders.search_reminders",
+  "reminders.create_reminder",
+  "reminders.update_reminder",
+  "reminders.delete_reminder",
+  "reminders.complete",
+  "reminders.show",
 ]);
 
 export function isCalendarOperation(request: ExecutorRequest): boolean {
   return (
     request.mode === "template" &&
-    request.bundleId === "com.apple.iCal" &&
     request.templateId !== undefined &&
-    operations.has(request.templateId)
+    operations.has(request.templateId) &&
+    ((request.bundleId === "com.apple.iCal" && request.templateId.startsWith("calendar.")) ||
+      (request.bundleId === "com.apple.reminders" && request.templateId.startsWith("reminders.")))
   );
 }
 

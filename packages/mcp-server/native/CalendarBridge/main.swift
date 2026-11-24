@@ -17,6 +17,13 @@ struct Request: Decodable {
     let location: String?
     let notes: String?
     let allDay: Bool?
+    let listId: String?
+    let reminderId: String?
+    let name: String?
+    let body: String?
+    let dueDate: String?
+    let priority: Int?
+    let completed: Bool?
 }
 
 struct EventReference: Codable {
@@ -254,6 +261,12 @@ struct CalendarBridge {
     static func main() async {
         do {
             let request = try JSONDecoder().decode(Request.self, from: FileHandle.standardInput.readDataToEndOfFile())
+            if request.operation.hasPrefix("reminders.") {
+                let result = try await executeRemindersRequest(request)
+                let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed])
+                FileHandle.standardOutput.write(data)
+                return
+            }
             try validate(request)
             if request.operation == "calendar.show" {
                 guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else {

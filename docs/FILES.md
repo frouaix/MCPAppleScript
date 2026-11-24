@@ -58,6 +58,7 @@ applescript-mcp/
           types.ts            # ResourceAdapter, ValidationContext, ValidationResult
           registry.ts         # AppRegistry
           notes.ts
+          calendar.ts
           reminders.ts
           mail.ts
           contacts.ts
@@ -71,8 +72,6 @@ applescript-mcp/
           index.ts            # dispatcher (routes by prefix)
           escape.ts           # esc(), wrapScript(), jsonEscHandlers
           notes.ts            # one per app...
-          calendar.ts
-          reminders.ts
           mail.ts
           contacts.ts
           messages.ts

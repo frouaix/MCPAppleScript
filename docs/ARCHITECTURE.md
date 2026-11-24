@@ -2,7 +2,7 @@
 
 MCP-AppleScript is a local stdio MCP server. A TypeScript process executes parameterized
 AppleScript through `child_process.execFile("osascript", ["-e", script])` without a shell.
-Calendar operations use a bundled Swift EventKit helper (AppKit opens Calendar).
+Calendar and Reminders operations use a bundled Swift EventKit helper (AppKit opens the apps).
 There is no HTTP transport.
 
 ```text
@@ -15,7 +15,7 @@ Trusted host selects --profile NAME
   -> adapter validation (Finder paths / Safari JavaScript)
   -> ResourceAdapter maps to an internal template
   -> user confirmation when required
-  -> Calendar: helper over JSON stdin -> EventKit / AppKit
+  -> Calendar and Reminders: helper over JSON stdin -> EventKit / AppKit
      Other apps: template -> osascript -> Apple Events
   -> JSON result or error returned
 ```
@@ -34,7 +34,7 @@ Separate instances keep separate grants, with no shared mutable policy.
 The host must restrict which instance a conversation can use. Profiles do not sandbox
 an agent with unrestricted shell access as the same macOS user. macOS TCC/Automation
 consent is a separate enforcement layer, not a read/write permission system.
-EventKit requires macOS Calendars Full Access, which allows writes at the OS level;
+EventKit requires separate macOS Calendars and Reminders Full Access grants, which allow writes at the OS level;
 the server's profile independently enforces read versus readwrite.
 
 Tool visibility and generic app enums reflect effective grants; every call is still

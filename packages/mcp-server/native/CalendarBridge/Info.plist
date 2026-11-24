@@ -16,5 +16,9 @@
     <string>Read or modify calendars and events as requested through the MCP server.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>Read or modify calendars and events as requested through the MCP server.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Read or modify reminders as requested through the MCP server.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Read or modify reminders as requested through the MCP server.</string>
 </dict>
 </plist>
