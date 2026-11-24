@@ -26,7 +26,7 @@ Actual app automation depends on macOS scripting support and Automation consent.
 
 ## Installation
 
-For source builds, install Node.js 20+, pnpm 8+, and Xcode command-line tools
+For source builds, install Node.js 20.12.0+, pnpm 8+, and Xcode command-line tools
 (including `swiftc` and `codesign`) on macOS:
 
 ```bash

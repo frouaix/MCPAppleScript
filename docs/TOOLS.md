@@ -13,7 +13,7 @@ See [configuration and profile examples](../README.md#permissions-and-named-prof
 | `app.list_containers` | `read` | None |
 | `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset`; Calendar requires `startDate` and `endDate` |
 | `app.get` | `read` | `id` |
-| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate` |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate` and accepts `offset` |
 | `app.create` | `readwrite` | `properties`, optional `containerId` |
 | `app.update` | `readwrite` + confirmation | `id`, `properties` |
 | `app.delete` | `readwrite` + confirmation | `id` |
@@ -99,8 +99,13 @@ EventKit may expose fewer calendars than the Calendar app; compare
 `calendar.list_calendars` with the app before treating an agenda as complete.
 Updates and deletions affect the selected occurrence, not future occurrences.
 Calendar `app.search` matches event titles in the required date range and returns
-the same paginated shape. Calendar creation takes a Calendar ID as `containerId`
+the same paginated shape; advance its `offset` by the returned item count while
+`hasMore` is true. Other app searches remain limited, unpaginated results.
+Calendar `app.get` retains `properties.startDate`, `properties.endDate`,
+`properties.location`, `properties.allDay`, and `properties.description` alongside
+the top-level event fields. Calendar creation takes a Calendar ID as `containerId`
 (omitting it uses the default calendar); event times need seconds and a UTC offset.
+Invalid create fields and empty updates are rejected before confirmation or dry runs.
 
 Initialization instructions describe enabled apps and suggested workflows; tool
 descriptions and schemas provide the same discovery hints for clients that ignore

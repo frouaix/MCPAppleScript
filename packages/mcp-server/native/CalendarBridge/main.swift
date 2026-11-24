@@ -73,6 +73,14 @@ func eventData(_ event: EKEvent) throws -> [String: Any] {
     ]
 }
 
+func eventResource(_ data: [String: Any], description: String) -> [String: Any] {
+    var result = data
+    var properties = data.filter { ["startDate", "endDate", "location", "allDay"].contains($0.key) }
+    properties["description"] = description
+    result["properties"] = properties
+    return result
+}
+
 func findEvent(_ id: String?, store: EKEventStore) throws -> EKEvent {
     guard let id = id, let data = Data(base64Encoded: id),
           let reference = try? JSONDecoder().decode(EventReference.self, from: data),
@@ -189,9 +197,7 @@ func execute(_ request: Request, store: EKEventStore) throws -> Any {
         ]
     case "calendar.get_event":
         let event = try findEvent(request.eventId, store: store)
-        var result = try eventData(event)
-        result["properties"] = ["description": event.notes ?? ""]
-        return result
+        return eventResource(try eventData(event), description: event.notes ?? "")
     case "calendar.create_event":
         guard let title = request.title, !title.isEmpty else { try fail("Event title is required.") }
         let start = try parseDate(request.startDate, field: "startDate")

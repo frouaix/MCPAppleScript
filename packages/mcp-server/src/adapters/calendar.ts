@@ -9,17 +9,53 @@ import {
   UnsupportedOperationError,
 } from "./types.js";
 import { z } from "zod";
+import { McpAppleScriptError } from "../util/errors.js";
+
+const eventTimestamp = z.string().datetime({ offset: true, precision: 0 });
 
 const calendarPropertiesSchema = z
   .object({
-    title: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
+    title: z.string().min(1).optional(),
+    startDate: eventTimestamp.optional(),
+    endDate: eventTimestamp.optional(),
     location: z.string().optional(),
     notes: z.string().optional(),
     allDay: z.boolean().optional(),
   })
   .strict();
+
+function validateEventProperties(
+  properties: Record<string, unknown>,
+  operation: "create" | "update"
+): z.infer<typeof calendarPropertiesSchema> {
+  const schema =
+    operation === "create"
+      ? calendarPropertiesSchema.extend({
+          title: z.string().min(1),
+          startDate: eventTimestamp,
+          endDate: eventTimestamp,
+        })
+      : calendarPropertiesSchema.refine(
+          (value) => Object.values(value).some((field) => field !== undefined),
+          "At least one event property is required."
+        );
+  const result = schema.safeParse(properties);
+  if (!result.success) {
+    throw new McpAppleScriptError(
+      "INVALID_REQUEST",
+      `Invalid Calendar ${operation}: ${result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(", ")}`
+    );
+  }
+  const { startDate, endDate } = result.data;
+  if (
+    startDate !== undefined &&
+    endDate !== undefined &&
+    Date.parse(endDate) <= Date.parse(startDate)
+  ) {
+    throw new McpAppleScriptError("INVALID_REQUEST", "endDate must follow startDate.");
+  }
+  return result.data;
+}
 
 export class CalendarAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -71,6 +107,7 @@ export class CalendarAdapter implements ResourceAdapter {
         query: params.query,
         calendarId: params.containerId ?? "",
         limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
         startDate: params.startDate,
         endDate: params.endDate,
         timeZone: params.timeZone,
@@ -79,25 +116,27 @@ export class CalendarAdapter implements ResourceAdapter {
   }
 
   create(params: CreateParams) {
+    const properties = validateEventProperties(params.properties, "create");
     return {
       templateId: "calendar.create_event",
       parameters: {
         calendarName: params.containerId ?? "",
-        title: params.properties.title ?? "",
-        startDate: params.properties.startDate ?? "",
-        endDate: params.properties.endDate ?? "",
-        location: params.properties.location ?? "",
-        notes: params.properties.notes ?? "",
-        allDay: params.properties.allDay ?? false,
+        title: properties.title,
+        startDate: properties.startDate,
+        endDate: properties.endDate,
+        location: properties.location ?? "",
+        notes: properties.notes ?? "",
+        allDay: properties.allDay ?? false,
       },
     };
   }
 
   update(params: UpdateParams) {
+    const properties = validateEventProperties(params.properties, "update");
     return {
       templateId: "calendar.update_event",
       parameters: {
-        ...params.properties,
+        ...properties,
         eventId: params.id,
       },
     };

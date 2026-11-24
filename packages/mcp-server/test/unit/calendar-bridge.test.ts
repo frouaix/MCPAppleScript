@@ -45,13 +45,38 @@ describe("EventKit dispatch", () => {
     });
   }
 
-  it("preserves the confirmed event ID even if update properties contain one", () => {
+  it("rejects event ID overrides in update properties", () => {
     const adapter = new CalendarAdapter();
-    assert.equal(
-      adapter.update({ id: "confirmed", properties: { eventId: "other" } }).parameters.eventId,
-      "confirmed"
-    );
+    assert.throws(() => adapter.update({ id: "confirmed", properties: { eventId: "other" } }));
     assert.equal(adapter.info.propertiesSchema?.safeParse({ eventId: "other" }).success, false);
+  });
+
+  it("rejects invalid create fields and empty updates before execution", () => {
+    const adapter = new CalendarAdapter();
+    for (const properties of [
+      {},
+      { title: "Meeting" },
+      { title: "", startDate: "2026-01-01T10:00:00Z", endDate: "2026-01-01T11:00:00Z" },
+      { title: "Meeting", startDate: "2026-01-01", endDate: "2026-01-02" },
+      { title: "Meeting", startDate: "2026-01-01T11:00:00Z", endDate: "2026-01-01T10:00:00Z" },
+    ]) {
+      assert.throws(() => adapter.create({ properties }));
+    }
+    assert.throws(() => adapter.update({ id: "fixture", properties: {} }));
+    assert.throws(() => adapter.update({ id: "fixture", properties: { title: undefined } }));
+    assert.throws(() =>
+      adapter.update({
+        id: "fixture",
+        properties: {
+          startDate: "2026-01-01T11:00:00Z",
+          endDate: "2026-01-01T10:00:00Z",
+        },
+      })
+    );
+    assert.equal(
+      adapter.update({ id: "fixture", properties: { allDay: false } }).parameters.allDay,
+      false
+    );
   });
 
   it("keeps Notes folder and body search", () => {

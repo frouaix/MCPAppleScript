@@ -217,6 +217,63 @@ describe("MCP stdio profile isolation", () => {
     }
   });
 
+  it("rejects invalid Calendar writes before confirmation or dry-run plans", async () => {
+    const client = await connect("organizer");
+    for (const dryRun of [true, false]) {
+      for (const [name, properties] of [
+        ["app.create", {}],
+        ["app.create", { title: "Meeting" }],
+        ["app.update", {}],
+      ] as const) {
+        const result = await client.callTool({
+          name,
+          arguments: { app: "calendar", id: "fixture", properties, dryRun },
+        });
+        assert.equal(result.isError, true);
+        assert.match(JSON.stringify(result.content), /Invalid Calendar/);
+        assert.doesNotMatch(JSON.stringify(result.content), /does not support it/);
+      }
+    }
+  });
+
+  it("forwards Calendar search offsets to EventKit", async () => {
+    const client = await connect("organizer");
+    for (const offset of [0, 200]) {
+      const result = await client.callTool({
+        name: "app.search",
+        arguments: {
+          app: "calendar",
+          query: "Meeting",
+          limit: 200,
+          offset,
+          dryRun: true,
+          startDate: "2026-11-23T00:00:00-08:00",
+          endDate: "2026-11-24T00:00:00-08:00",
+        },
+      });
+      assert.ok(!result.isError);
+      assert.ok(Array.isArray(result.content));
+      const first = result.content[0];
+      assert.ok(first && first.type === "text");
+      const plan = JSON.parse(first.text);
+      assert.equal(plan.operation, "calendar.search_events");
+      assert.equal(plan.offset, offset);
+      assert.equal(plan.limit, 200);
+    }
+    const invalid = await client.callTool({
+      name: "app.search",
+      arguments: {
+        app: "calendar",
+        query: "Meeting",
+        offset: -1,
+        dryRun: true,
+        startDate: "2026-11-23T00:00:00-08:00",
+        endDate: "2026-11-24T00:00:00-08:00",
+      },
+    });
+    assert.equal(invalid.isError, true);
+  });
+
   it("enforces different simultaneous grants at the tool-call boundary, including dry runs", async () => {
     const research = await connect("research");
     const organizer = await connect("organizer");

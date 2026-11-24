@@ -98,6 +98,7 @@ export interface SearchParams {
   query: string;
   containerId?: string;
   limit?: number;
+  offset?: number;
   startDate?: string;
   endDate?: string;
   timeZone?: string;

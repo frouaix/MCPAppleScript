@@ -229,18 +229,24 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           .optional()
           .describe("Limit search to a specific container"),
         limit: z.number().int().min(1).max(200).optional().describe("Max results (default: 20)"),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Calendar only: pagination offset (default: 0)"),
         startDate: timestamp.optional().describe("Calendar only: inclusive range start"),
         endDate: timestamp.optional().describe("Calendar only: exclusive range end"),
         dryRun: dryRunParam,
       },
       { readOnlyHint: true },
-      async ({ app, query, containerId, limit, startDate, endDate, dryRun }) => {
+      async ({ app, query, containerId, limit, offset, startDate, endDate, dryRun }) => {
         const adapter = appRegistry.getOrThrow(app);
         policy.assertAllowed({ toolName: "app.search", app });
 
         const validationError = runValidation(
           adapter,
-          { app, query, containerId, limit, dryRun },
+          { app, query, containerId, limit, offset, dryRun },
           validationContext
         );
         if (validationError)
@@ -250,7 +256,13 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           };
 
         const range = app === "calendar" ? resolveEventRange({ startDate, endDate }) : {};
-        const { templateId, parameters } = adapter.search({ query, containerId, limit, ...range });
+        const { templateId, parameters } = adapter.search({
+          query,
+          containerId,
+          limit,
+          offset,
+          ...range,
+        });
         return executeTemplate(templateId, adapter.info.bundleId, parameters, dryRun ?? false);
       }
     )

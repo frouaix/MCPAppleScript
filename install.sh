@@ -18,6 +18,7 @@ command -v swiftc >/dev/null 2>&1 || { echo "❌ swiftc is required. Install Xco
 command -v codesign >/dev/null 2>&1 || { echo "❌ codesign is required. Install Xcode command-line tools."; exit 1; }
 
 NODE_VERSION=$(node --version)
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 20 || (major === 20 && minor < 12)) { console.error("Node.js 20.12.0 or newer is required."); process.exit(1); }'
 echo "✓ Node.js $NODE_VERSION"
 echo ""
 

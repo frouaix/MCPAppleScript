@@ -9,6 +9,23 @@ struct CalendarBridgeTests {
         precondition(formatEventDate(before, in: zone) == "2026-03-08T01:30:00-08:00")
         precondition(formatEventDate(after, in: zone) == "2026-03-08T03:30:00-07:00")
 
+        let event: [String: Any] = [
+            "id": "fixture", "type": "event",
+            "startDate": "2026-03-08T01:30:00-08:00",
+            "endDate": "2026-03-08T03:30:00-07:00",
+            "location": "Office", "allDay": false,
+        ]
+        let resource = eventResource(event, description: "Agenda")
+        let serialized = try JSONSerialization.data(withJSONObject: resource)
+        let decodedResource = try JSONSerialization.jsonObject(with: serialized) as! [String: Any]
+        let properties = decodedResource["properties"] as! [String: Any]
+        precondition(properties["startDate"] as? String == event["startDate"] as? String)
+        precondition(properties["endDate"] as? String == event["endDate"] as? String)
+        precondition(properties["location"] as? String == "Office")
+        precondition(properties["allDay"] as? Bool == false)
+        precondition(properties["description"] as? String == "Agenda")
+        precondition(decodedResource["startDate"] as? String == event["startDate"] as? String)
+
         let reference = EventReference(eventIdentifier: "series", calendarIdentifier: "calendar", startInterval: 100.25)
         let id = try JSONEncoder().encode(reference).base64EncodedString()
         let request = try JSONDecoder().decode(Request.self, from: Data("{\"operation\":\"calendar.get_event\",\"eventId\":\"\(id)\"}".utf8))
