@@ -110,9 +110,9 @@ Invalid create fields and empty updates are rejected before confirmation or dry 
 
 ### Reminders
 
-Reminders use EventKit and require a separate macOS Reminders Full Access grant for
-`CalendarBridge.app`. This permits writes at the OS level even for an MCP read-only
-profile. List IDs and reminder IDs come from EventKit; obtain them using
+Reminders use EventKit and require a separate macOS Reminders Full Access grant.
+The app attributed by macOS depends on the launcher. Full Access permits writes at
+the OS level even for an MCP read-only profile. Obtain EventKit IDs using
 `app.list_containers` and `app.list`. List and search return `total`, `offset`,
 `hasMore`, and `items`; search matches titles and honors `containerId` and `offset`.
 Create and update accept `name`, `body`, `priority` (0-9), `completed`, and `dueDate`
@@ -156,8 +156,8 @@ supports it. Bundle IDs are internal; configuration and tool inputs use short na
 3. Adapter validation applies additional restrictions, including Finder path allowlists
    and Safari JavaScript opt-in.
 4. The adapter maps to a known template.
-5. Real consequential writes require MCP form elicitation. Missing support, rejection,
-   or cancellation prevents execution. Tokens cannot substitute for user confirmation.
+5. Updates, deletions, and `send`/`move`/`do_javascript` actions require MCP form
+   elicitation. Missing support, rejection, or cancellation prevents execution.
 6. Calendar and Reminders use the EventKit helper (AppKit for `show`); other apps use
    parameterized AppleScript via `osascript`. Each has an execution timeout.
 7. macOS independently enforces Calendar/Reminders Full Access or Automation consent.

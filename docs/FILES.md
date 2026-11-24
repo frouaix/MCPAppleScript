@@ -71,7 +71,7 @@ applescript-mcp/
         templates/            # AppleScript template builders
           index.ts            # dispatcher (routes by prefix)
           escape.ts           # esc(), wrapScript(), jsonEscHandlers
-          notes.ts            # one per app...
+          notes.ts
           mail.ts
           contacts.ts
           messages.ts
