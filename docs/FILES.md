@@ -21,7 +21,7 @@ applescript-mcp/
   dist/
     bundle.cjs              # esbuild-bundled CJS
     mcp-applescript           # SEA binary (Mach-O)
-    CalendarBridge.app/       # Native EventKit helper, kept beside SEA binary
+    MCPBridge.app/            # Native app helper, kept beside SEA binary
     sea-config.json           # Node.js SEA configuration
     sea-prep.blob             # Prepared SEA blob
 
@@ -74,14 +74,13 @@ applescript-mcp/
           notes.ts
           mail.ts
           messages.ts
-          photos.ts
           music.ts
           finder.ts
           safari.ts
 
         exec/
-          executor.ts         # Dispatch to osascript or EventKit helper
-          calendar-bridge.ts  # Native helper process and JSON transport
+          executor.ts         # Dispatch to osascript or native helper
+          mcp-bridge.ts       # Native helper process and JSON transport
           types.ts            # ExecutorRequest/Response interfaces
 
         policy/

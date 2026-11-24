@@ -9,7 +9,7 @@
     "mcp-applescript": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc && bash native/build-calendar-bridge.sh",
+    "build": "tsc && bash native/build-mcp-bridge.sh",
     "dev": "tsx watch src/index.ts",
     "test": "npx tsx --test test/unit/*.test.ts",
     "test:unit": "npx tsx --test test/unit/*.test.ts",

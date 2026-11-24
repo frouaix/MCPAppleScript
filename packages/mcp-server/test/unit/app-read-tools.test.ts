@@ -10,6 +10,7 @@ import {
   NotesAdapter,
   RemindersAdapter,
   ContactsAdapter,
+  PhotosAdapter,
 } from "../../src/adapters/index.js";
 import { ConfigSchema } from "../../src/config/schema.js";
 import { PolicyEngine } from "../../src/policy/policy.js";
@@ -99,6 +100,7 @@ describe("App-specific read dispatch", () => {
     appRegistry.register(new CalendarAdapter());
     appRegistry.register(new RemindersAdapter());
     appRegistry.register(new ContactsAdapter());
+    appRegistry.register(new PhotosAdapter());
     const calls: Array<{
       templateId: string;
       bundleId: string;
@@ -111,7 +113,13 @@ describe("App-specific read dispatch", () => {
       policy: new PolicyEngine(
         ConfigSchema.parse({
           permissions: {
-            apps: { notes: "read", calendar: "read", reminders: "read", contacts: "read" },
+            apps: {
+              notes: "read",
+              calendar: "read",
+              reminders: "read",
+              contacts: "read",
+              photos: "read",
+            },
           },
         }),
         new Logger({ level: "error", redact: [] })
@@ -186,6 +194,13 @@ describe("App-specific read dispatch", () => {
       assert.ok(!contact.isError);
       assert.equal(calls.at(-1)?.templateId, "contacts.get_person");
       assert.equal(calls.at(-1)?.parameters.personId, "fixture");
+      const photos = await client.callTool({
+        name: "photos.list_recent",
+        arguments: { albumId: "album", limit: 5, offset: 2 },
+      });
+      assert.ok(!photos.isError);
+      assert.equal(calls.at(-1)?.templateId, "photos.list_items");
+      assert.deepEqual(calls.at(-1)?.parameters, { albumId: "album", limit: 5, offset: 2 });
     } finally {
       await client.close();
       await server.close();

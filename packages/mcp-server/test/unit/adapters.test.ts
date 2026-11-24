@@ -298,6 +298,19 @@ describe("MessagesAdapter", () => {
 describe("PhotosAdapter", () => {
   const adapter = new PhotosAdapter();
 
+  it("validates writes and preserves search pagination and album filters", () => {
+    assert.throws(() => adapter.create({ properties: {} }));
+    assert.throws(() => adapter.create({ properties: { name: " ", extra: true } }));
+    assert.throws(() => adapter.action({ action: "import", parameters: { filePath: "relative" } }));
+    assert.throws(() =>
+      adapter.action({ action: "import", parameters: { filePath: "/tmp/x", extra: true } })
+    );
+    assert.deepEqual(
+      adapter.search({ query: "beach", containerId: "album", limit: 5, offset: 2 }).parameters,
+      { query: "beach", albumId: "album", limit: 5, offset: 2 }
+    );
+  });
+
   it("has correct info", () => {
     assert.equal(adapter.info.name, "photos");
     assert.equal(adapter.info.bundleId, "com.apple.Photos");

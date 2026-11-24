@@ -24,16 +24,16 @@ TypeScript stdio server with subprocesses for macOS access:
 
 ```
 MCP Client → TypeScript MCP Server → osascript → macOS Apps (via Apple Events)
-                                  → Swift Calendar Bridge → EventKit / AppKit
+                                  → Swift MCPBridge → native macOS frameworks
 ```
 
 **Transport**: stdio only. Select an immutable permission profile with `--profile NAME`.
 
-**Data flow for a tool call**: MCP request → Zod validation → per-app permission check → adapter validation → `ResourceAdapter` maps to `{templateId, parameters}` → user confirmation when required → Calendar Bridge or parameterized AppleScript → JSON result returned.
+**Data flow for a tool call**: MCP request → Zod validation → per-app permission check → adapter validation → `ResourceAdapter` maps to `{templateId, parameters}` → user confirmation when required → MCPBridge or parameterized AppleScript → JSON result returned.
 
 ### ResourceAdapter Pattern
 
-The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`). Calendar uses `native/CalendarBridge`; other apps have a template module (`packages/mcp-server/src/templates/{app}.ts`).
+The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`). Calendar, Reminders, Contacts, and Photos use `native/MCPBridge`; other apps have a template module (`packages/mcp-server/src/templates/{app}.ts`).
 
 The adapter maps generic CRUD operations (`list`, `get`, `search`, `create`, `update`, `delete`, `action`) to `{templateId, parameters}` pairs. The template dispatcher routes by template ID prefix (e.g. `notes.create_note` → `notes.build()`).
 

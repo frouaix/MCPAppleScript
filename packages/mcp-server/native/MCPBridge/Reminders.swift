@@ -149,7 +149,7 @@ func executeRemindersRequest(_ request: Request) async throws -> Any {
         }
     }
     guard granted else {
-        try fail("Reminders access denied. Enable Full Access for the Calendar Bridge in System Settings > Privacy & Security > Reminders.")
+        try fail("Reminders access denied. Enable Full Access for MCPBridge in System Settings > Privacy & Security > Reminders.")
     }
     return try await executeReminders(request, store: store)
 }

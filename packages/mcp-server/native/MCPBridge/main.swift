@@ -255,13 +255,20 @@ func execute(_ request: Request, store: EKEventStore) throws -> Any {
     }
 }
 
-#if !CALENDAR_BRIDGE_TEST
+#if !MCP_BRIDGE_TEST
 @main
-struct CalendarBridge {
+struct MCPBridge {
     static func main() async {
         do {
             let input = FileHandle.standardInput.readDataToEndOfFile()
             let request = try JSONDecoder().decode(Request.self, from: input)
+            if request.operation.hasPrefix("photos.") {
+                let photosRequest = try JSONDecoder().decode(PhotosRequest.self, from: input)
+                let result = try await executePhotosRequest(photosRequest)
+                let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed])
+                FileHandle.standardOutput.write(data)
+                return
+            }
             if request.operation.hasPrefix("contacts.") {
                 let contactRequest = try JSONDecoder().decode(ContactsRequest.self, from: input)
                 let result = try await executeContactsRequest(contactRequest)
@@ -297,7 +304,7 @@ struct CalendarBridge {
                 }
             }
             guard granted else {
-                try fail("Calendar access denied. Enable Full Access for the Calendar Bridge in System Settings > Privacy & Security > Calendars.")
+                try fail("Calendar access denied. Enable Full Access for MCPBridge in System Settings > Privacy & Security > Calendars.")
             }
             let data = try JSONSerialization.data(withJSONObject: execute(request, store: store), options: [.fragmentsAllowed])
             FileHandle.standardOutput.write(data)

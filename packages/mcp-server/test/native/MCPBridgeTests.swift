@@ -2,7 +2,7 @@ import Foundation
 import Contacts
 
 @main
-struct CalendarBridgeTests {
+struct MCPBridgeTests {
     static func main() throws {
         let zone = TimeZone(identifier: "America/Los_Angeles")!
         let before = formatter.date(from: "2026-03-08T09:30:00Z")!
@@ -113,6 +113,25 @@ struct CalendarBridgeTests {
         do {
             try validateContactsRequest(invalidContact)
             fatalError("Empty contact update accepted")
+        } catch { }
+
+        precondition(photosMatchingCaption("A Sunny Beach", query: "sunny"))
+        precondition(!photosMatchingCaption(nil, query: "sunny"))
+        precondition(!photosMatchingCaption("A Sunny Beach", query: "mountain"))
+        precondition(photosFetchOptions().sortDescriptors?.map(\.key) == ["creationDate"])
+        precondition(photoPageBounds(total: 7, offset: 2, limit: 3) == 2..<5)
+        precondition(photoPageBounds(total: 7, offset: 6, limit: 3) == 6..<7)
+        precondition(photoPageBounds(total: 7, offset: 20, limit: 3) == 7..<7)
+        let photoRequest = try JSONDecoder().decode(PhotosRequest.self, from: Data("""
+        {"operation":"photos.search_items","query":"beach","limit":5,"offset":2}
+        """.utf8))
+        try validatePhotosRequest(photoRequest)
+        let invalidPhoto = try JSONDecoder().decode(PhotosRequest.self, from: Data("""
+        {"operation":"photos.get_item"}
+        """.utf8))
+        do {
+            try validatePhotosRequest(invalidPhoto)
+            fatalError("Missing photo ID accepted")
         } catch { }
     }
 }
