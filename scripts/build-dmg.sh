@@ -32,6 +32,10 @@ if [[ ! -f "$BINARY" ]]; then
   echo "Error: $BINARY not found. Run ./scripts/build-sea.sh first."
   exit 1
 fi
+if [[ ! -x "$DIST_DIR/CalendarBridge.app/Contents/MacOS/CalendarBridge" ]]; then
+  echo "Error: CalendarBridge.app not found. Run ./scripts/build-sea.sh first."
+  exit 1
+fi
 
 ARCH=$(uname -m)
 DMG_NAME="MCP-AppleScript-${VERSION}-${ARCH}.dmg"
@@ -46,6 +50,7 @@ mkdir -p "$STAGING"
 
 # Copy binary
 cp "$BINARY" "$STAGING/mcp-applescript"
+cp -R "$DIST_DIR/CalendarBridge.app" "$STAGING/CalendarBridge.app"
 
 # Create a README for the DMG
 cat > "$STAGING/INSTALL.txt" <<'INSTALL_EOF'
@@ -66,8 +71,9 @@ MCP-AppleScript Bridge Server
   Provided as-is with no warranty. See LICENSE.
 
 Installation:
-  1. Copy "mcp-applescript" to /usr/local/bin/ (or another directory in your PATH):
+  1. Copy the executable and its Calendar helper to the same directory:
        sudo cp mcp-applescript /usr/local/bin/
+       sudo cp -R CalendarBridge.app /usr/local/bin/
 
   2. Create a config file at ~/.config/applescript-mcp/config.json:
        mkdir -p ~/.config/applescript-mcp
@@ -95,7 +101,9 @@ Installation:
          }
        }
 
-  4. Grant macOS automation permissions when prompted (System Settings > Privacy & Security > Automation).
+  4. Grant macOS Automation permissions for other apps and Calendar Full Access
+     for the Calendar Bridge when prompted. Calendar Full Access permits writes
+     at the OS level; the server's profile still enforces its own read/write policy.
 
 For full documentation, visit: https://github.com/frouaix/MCPAppleScript
 INSTALL_EOF

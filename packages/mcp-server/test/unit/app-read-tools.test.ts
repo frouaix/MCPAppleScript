@@ -75,6 +75,7 @@ describe("Calendar time ranges", () => {
     { startDate: "2026-01-01T00:00:00Z" },
     { startDate: "invalid", endDate: "invalid" },
     { startDate: "2026-01-01T00:00:00Z", endDate: "2026-01-01T00:00:00Z" },
+    { startDate: "2026-01-01T00:00:00Z", endDate: "2030-01-01T00:00:00Z" },
     { day: "today" as const, endDate: "2026-01-01T00:00:00Z" },
   ]) {
     it(`rejects invalid range ${JSON.stringify(input)}`, () => {

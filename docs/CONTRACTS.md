@@ -33,7 +33,7 @@ scripts, template IDs, or bundle IDs directly.
 | `parameters` | object | Yes | Template parameters |
 | `script` | string | Conditional | Required when `mode: "raw"` — raw AppleScript source |
 | `timeoutMs` | number | Yes | Max execution time in ms (default: 12000) |
-| `dryRun` | boolean | No | If true, returns generated script without executing |
+| `dryRun` | boolean | No | If true, returns the generated script or EventKit plan without executing |
 
 ### Success Response (template mode)
 
@@ -84,6 +84,6 @@ scripts, template IDs, or bundle IDs directly.
 | `AUTOMATION_DENIED` | macOS automation permission denied (-1743) |
 | `APP_NOT_RUNNING` | Target app is not running (-600, -10810) |
 | `SCRIPT_ERROR` | AppleScript compilation or runtime error |
-| `TIMEOUT` | Script exceeded `timeoutMs` (killed by SIGKILL) |
+| `TIMEOUT` | Operation exceeded `timeoutMs` (killed by SIGKILL) |
 | `INVALID_REQUEST` | Missing required field (e.g. `templateId` in template mode) |
-| `EXECUTOR_FAILED` | Failed to spawn `osascript` process |
+| `EXECUTOR_FAILED` | Helper failure, invalid helper output, or failure to spawn the process |

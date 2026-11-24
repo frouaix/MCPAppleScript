@@ -20,21 +20,20 @@ pnpm build:dmg                  # Package as .dmg
 
 ## Architecture
 
-Single-process TypeScript architecture using `osascript` for AppleScript execution:
+TypeScript stdio server with subprocesses for macOS access:
 
 ```
 MCP Client → TypeScript MCP Server → osascript → macOS Apps (via Apple Events)
-               (protocol, policy,     (CLI tool)
-                adapters, templates)
+                                  → Swift Calendar Bridge → EventKit / AppKit
 ```
 
 **Transport**: stdio only. Select an immutable permission profile with `--profile NAME`.
 
-**Data flow for a tool call**: MCP request → Zod validation → per-app permission check → adapter validation → `ResourceAdapter` maps to `{templateId, parameters}` → user confirmation when required → TypeScript template builder generates AppleScript → executed via `osascript` → JSON result returned.
+**Data flow for a tool call**: MCP request → Zod validation → per-app permission check → adapter validation → `ResourceAdapter` maps to `{templateId, parameters}` → user confirmation when required → Calendar Bridge or parameterized AppleScript → JSON result returned.
 
 ### ResourceAdapter Pattern
 
-The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`) and a TypeScript template module (`packages/mcp-server/src/templates/{app}.ts`).
+The core abstraction. Each of the 10 Apple apps has a TypeScript adapter (`packages/mcp-server/src/adapters/`). Calendar uses `native/CalendarBridge`; other apps have a template module (`packages/mcp-server/src/templates/{app}.ts`).
 
 The adapter maps generic CRUD operations (`list`, `get`, `search`, `create`, `update`, `delete`, `action`) to `{templateId, parameters}` pairs. The template dispatcher routes by template ID prefix (e.g. `notes.create_note` → `notes.build()`).
 
@@ -56,7 +55,7 @@ consequential writes; declined confirmation never falls back to model-visible to
 
 ## Executor
 
-The executor uses `child_process.execFile('osascript', ['-e', script])` — no shell involved. Error classification maps osascript stderr patterns to error codes:
+The executor uses `child_process.execFile` for the EventKit helper or `osascript`, without a shell. Error classification maps osascript stderr patterns to error codes:
 
 - `-1743` → `AUTOMATION_DENIED`
 - `-600`/`-10810` → `APP_NOT_RUNNING`

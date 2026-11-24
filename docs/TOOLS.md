@@ -11,9 +11,9 @@ See [configuration and profile examples](../README.md#permissions-and-named-prof
 | `applescript.ping` | None | None; no `app` or `dryRun` |
 | `applescript.get_permissions` | None | None; reports `profile` (null if absent) and effective per-app `permissions` |
 | `app.list_containers` | `read` | None |
-| `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset` |
+| `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset`; Calendar requires `startDate` and `endDate` |
 | `app.get` | `read` | `id` |
-| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200) |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate` and accepts `offset` |
 | `app.create` | `readwrite` | `properties`, optional `containerId` |
 | `app.update` | `readwrite` + confirmation | `id`, `properties` |
 | `app.delete` | `readwrite` + confirmation | `id` |
@@ -30,7 +30,8 @@ explicitly. `app.action` is absent unless an app is readwrite or Music is readab
 With every app off, only the two `applescript.*` inspection tools remain.
 Authorization is enforced on every invocation, not merely through tool visibility.
 A dry run still requires the same permission and adapter
-validation, but returns the generated script without executing or confirming it.
+validation, but returns the generated script or EventKit execution plan without
+executing or confirming it.
 
 There are no raw-script, arbitrary-template, or permission-changing tools.
 Templates are an internal implementation detail, never a client-provided dispatch path.
@@ -43,8 +44,8 @@ the generic operations' policy checks, adapters, validation, and executor. They 
 
 | Tool | Inputs | Result |
 |---|---|---|
-| `calendar.list_calendars` | None | Calendar names (also used as IDs; not stable) |
-| `calendar.list_events` | `day: "today" \| "tomorrow"`, or both `startDate` and `endDate`; optional `calendarId`, `limit`, `offset` | Chronological overlapping events with pagination and limitations |
+| `calendar.list_calendars` | None | Calendar IDs and names |
+| `calendar.list_events` | `day: "today" \| "tomorrow"`, or both `startDate` and `endDate`; optional `calendarId`, `limit`, `offset` | Chronological overlapping events, including recurring occurrences, with pagination |
 | `notes.list_folders` | None | Folder IDs, names, item counts |
 | `notes.list_notes` | Optional `folderId`, `limit`, `offset` | `total`, `items`: note IDs, titles, modification dates |
 | `notes.search_notes` | `query`; optional `folderId`, `limit` | Matching IDs, titles, modification dates; searches title or plain-text body |
@@ -77,24 +78,34 @@ For an explicit range spanning the spring daylight-saving transition:
 `day` uses the Mac's current local calendar day and time zone, including daylight-saving
 boundaries, not the next 24 hours. Do not mix it with explicit bounds. Explicit timestamps
 require seconds and `Z` or a UTC offset, without fractional seconds. The exclusive
-`endDate` must follow `startDate`. Events overlap when their start precedes the end
+`endDate` must follow `startDate`; ranges cannot exceed 1,098 days. Events overlap when their start precedes the end
 bound and their end follows the start bound, including multi-day/all-day events.
-Omit `calendarId` to query all calendars. Calendar's identifier property can fail
-on macOS, so the `id` and `calendarId` fields contain the calendar name instead.
-Renaming a calendar changes this value. If multiple calendars share a name, filtering
-by that name fails explicitly; omit `calendarId` to include all calendars instead.
+Omit `calendarId` to query all calendars; otherwise use an ID from
+`calendar.list_calendars`, not a name. Old AppleScript calendar and event IDs
+are not compatible; list them again after upgrading.
 
 Calendar list results (including generic `app.list` for Calendar) contain `total`,
-`offset`, `hasMore`, `timeZone` (the Mac's IANA zone), `limitations`, and `items`.
+`offset`, `hasMore`, `timeZone` (the Mac's IANA zone), range bounds, `limitations`,
+and `items`.
 Each event has `id`, `name`, `calendarId`, `calendarName`, `startDate`, `endDate`,
-`location`, `allDay`, and `recurrence`. Dates are UTC ISO timestamps; empty location
-or recurrence is an empty string. Events are sorted by start then ID before pagination.
+`location`, `allDay`, `timeZone`, and `isRecurring`. Dates use the Mac's local
+time zone as ISO timestamps with explicit UTC offsets; empty location
+is an empty string. Events are sorted by start then EventKit identifier before pagination.
 While `hasMore` is true, add the returned item count to `offset` using the same bounds.
 
-**AppleScript recurrence masters are not expanded into occurrences.** An older
-recurring series may therefore be missing from a future date range. Every result
-includes this limitation; never summarize the result as a complete recurring schedule.
-No EventKit permission or calendar database access is added by these tools.
+EventKit returns recurring occurrences. Event IDs identify a specific occurrence and
+may become stale after calendar changes or synchronization; list again if not found.
+EventKit may expose fewer calendars than the Calendar app; compare
+`calendar.list_calendars` with the app before treating an agenda as complete.
+Updates and deletions affect the selected occurrence, not future occurrences.
+Calendar `app.search` matches event titles in the required date range and returns
+the same paginated shape; advance its `offset` by the returned item count while
+`hasMore` is true. Other app searches remain limited, unpaginated results.
+Calendar `app.get` retains `properties.startDate`, `properties.endDate`,
+`properties.location`, `properties.allDay`, and `properties.description` alongside
+the top-level event fields. Calendar creation takes a Calendar ID as `containerId`
+(omitting it uses the default calendar); event times need seconds and a UTC offset.
+Invalid create fields and empty updates are rejected before confirmation or dry runs.
 
 Initialization instructions describe enabled apps and suggested workflows; tool
 descriptions and schemas provide the same discovery hints for clients that ignore
@@ -127,8 +138,9 @@ supports it. Bundle IDs are internal; configuration and tool inputs use short na
 4. The adapter maps to a known template.
 5. Real consequential writes require MCP form elicitation. Missing support, rejection,
    or cancellation prevents execution. Tokens cannot substitute for user confirmation.
-6. Parameterized AppleScript is executed with a timeout via `osascript`.
-7. macOS independently enforces Automation consent.
+6. Calendar operations use the EventKit helper (AppKit for `show`); other apps use
+   parameterized AppleScript via `osascript`. Each has an execution timeout.
+7. macOS independently enforces Calendar Full Access or Automation consent.
 
 Use `finder.allowedPaths` to restrict filesystem scope and `safari.doJavaScript` to
 opt into JavaScript. Neither option grants app access by itself.

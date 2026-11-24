@@ -95,7 +95,11 @@ describe("CalendarAdapter", () => {
   it("create passes properties correctly", () => {
     const result = adapter.create({
       containerId: "Work",
-      properties: { title: "Meeting", startDate: "2025-01-01", endDate: "2025-01-01" },
+      properties: {
+        title: "Meeting",
+        startDate: "2025-01-01T10:00:00Z",
+        endDate: "2025-01-01T11:00:00Z",
+      },
     });
     assert.equal(result.templateId, "calendar.create_event");
     assert.equal(result.parameters.calendarName, "Work");

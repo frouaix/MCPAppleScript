@@ -18,8 +18,9 @@ pnpm build
 
 - `packages/mcp-server/` — TypeScript MCP server (Node.js)
   - `src/adapters/` — Per-app resource adapters
-  - `src/templates/` — AppleScript template builders (one per app)
-  - `src/exec/` — osascript executor
+  - `src/templates/` — AppleScript template builders (except Calendar)
+  - `src/exec/` — osascript and native Calendar helper execution
+  - `native/CalendarBridge/` — Swift EventKit and AppKit implementation
   - `src/policy/` — Immutable per-app grants and named profiles (stdio only)
 - `docs/` — Architecture and design documentation
 

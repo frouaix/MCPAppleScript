@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>CalendarBridge</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.mcp-applescript.calendar-bridge</string>
+    <key>CFBundleName</key>
+    <string>MCP AppleScript Calendar Bridge</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Read or modify calendars and events as requested through the MCP server.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Read or modify calendars and events as requested through the MCP server.</string>
+</dict>
+</plist>
