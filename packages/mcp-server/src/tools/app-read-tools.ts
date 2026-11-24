@@ -13,7 +13,7 @@ const id = z.string().min(1).max(500);
 export function registerAppReadTools(deps: CrudToolDeps): void {
   const { server, registerTool, policy, appRegistry, executeTemplate, validationContext } = deps;
   function execute(
-    app: "calendar" | "notes" | "reminders",
+    app: "calendar" | "notes" | "reminders" | "contacts",
     operation: string,
     params: Record<string, unknown>,
     mapped: () => { templateId: string; parameters: Record<string, unknown> }
@@ -24,6 +24,46 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
     if (error) return Promise.resolve(error);
     const { templateId, parameters } = mapped();
     return executeTemplate(templateId, adapter.info.bundleId, parameters, params.dryRun === true);
+  }
+
+  if (policy.getPermissions().contacts !== "off") {
+    const adapter = appRegistry.getOrThrow("contacts");
+    registerTool(
+      "contacts.search",
+      server.tool(
+        "contacts.search",
+        "Find contacts by name, organization, email, or phone. Returns IDs and names, with pagination. Use contacts.get to read details.",
+        {
+          query: z.string().min(1).max(500),
+          groupId: id
+            .optional()
+            .describe("Group ID from app.list_containers; omit for all contacts"),
+          limit: limit.describe("Page size, default 20"),
+          offset,
+          dryRun,
+        },
+        { readOnlyHint: true },
+        (params) =>
+          execute("contacts", "app.search", params, () =>
+            adapter.search({
+              query: params.query,
+              containerId: params.groupId,
+              limit: params.limit,
+              offset: params.offset,
+            })
+          )
+      )
+    );
+    registerTool(
+      "contacts.get",
+      server.tool(
+        "contacts.get",
+        "Read a contact's name, organization, job title, labeled email addresses, and phone numbers by ID from contacts.search.",
+        { contactId: id, dryRun },
+        { readOnlyHint: true },
+        (params) => execute("contacts", "app.get", params, () => adapter.get(params.contactId))
+      )
+    );
   }
 
   if (policy.getPermissions().reminders !== "off") {

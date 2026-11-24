@@ -40,6 +40,7 @@ describe("MCP stdio profile isolation", () => {
           research: { apps: { notes: "read", music: "read" } },
           private: { apps: { notes: "read", calendar: "read" } },
           remindersRead: { apps: { reminders: "read" } },
+          contactsRead: { apps: { contacts: "read" } },
           disabled: {},
           organizer: { default: "readwrite" },
         },
@@ -245,6 +246,7 @@ describe("MCP stdio profile isolation", () => {
       name: "reminders.list_due",
       arguments: { day: "today", limit: 5, dryRun: true },
     });
+
     assert.ok(!due.isError);
     assert.match(JSON.stringify(due.content), /reminders.list_due/);
     const disabled = await connect("private");
@@ -290,6 +292,37 @@ describe("MCP stdio profile isolation", () => {
       assert.equal(result.isError, true);
       assert.match(JSON.stringify(result.content), /flagged/);
     }
+  });
+
+  it("uses the Contacts framework and enforces read-only profiles", async () => {
+    const reader = await connect("contactsRead");
+    const tools = await reader.listTools();
+    assert.ok(tools.tools.some((tool) => tool.name === "contacts.search"));
+    assert.ok(tools.tools.some((tool) => tool.name === "contacts.get"));
+    const search = await reader.callTool({
+      name: "contacts.search",
+      arguments: { query: "Example", groupId: "group", limit: 5, offset: 2, dryRun: true },
+    });
+    assert.ok(!search.isError);
+    assert.ok(Array.isArray(search.content));
+    const first = search.content[0];
+    assert.ok(first && first.type === "text");
+    const plan = JSON.parse(first.text);
+    assert.equal(plan.backend, "Contacts");
+    assert.equal(plan.groupId, "group");
+    assert.equal(plan.offset, 2);
+    const details = await reader.callTool({
+      name: "contacts.get",
+      arguments: { contactId: "fixture", dryRun: true },
+    });
+    assert.ok(!details.isError);
+    const denied = await reader.callTool({
+      name: "app.create",
+      arguments: { app: "contacts", properties: { firstName: "Example" }, dryRun: true },
+    });
+    assert.equal(denied.isError, true);
+    const disabled = await connect("private");
+    assert.ok(!(await disabled.listTools()).tools.some((tool) => tool.name === "contacts.search"));
   });
 
   it("forwards Calendar search offsets to EventKit", async () => {

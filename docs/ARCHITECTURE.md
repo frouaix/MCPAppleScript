@@ -2,7 +2,8 @@
 
 MCP-AppleScript is a local stdio MCP server. A TypeScript process executes parameterized
 AppleScript through `child_process.execFile("osascript", ["-e", script])` without a shell.
-Calendar and Reminders operations use a bundled Swift EventKit helper (AppKit opens the apps).
+Calendar and Reminders use EventKit; Contacts uses the Contacts framework. A bundled
+Swift helper provides these APIs and uses AppKit to open the apps.
 There is no HTTP transport.
 
 ```text
@@ -15,7 +16,7 @@ Trusted host selects --profile NAME
   -> adapter validation (Finder paths / Safari JavaScript)
   -> ResourceAdapter maps to an internal template
   -> user confirmation when required
-  -> Calendar and Reminders: helper over JSON stdin -> EventKit / AppKit
+  -> Calendar, Reminders, Contacts: helper over JSON stdin -> native frameworks
      Other apps: template -> osascript -> Apple Events
   -> JSON result or error returned
 ```
@@ -35,10 +36,11 @@ The host must restrict which instance a conversation can use. Profiles do not sa
 an agent with unrestricted shell access as the same macOS user. macOS TCC/Automation
 consent is a separate enforcement layer, not a read/write permission system.
 EventKit requires separate macOS Calendars and Reminders Full Access grants, which allow writes at the OS level;
-the server's profile independently enforces read versus readwrite.
+Contacts has its own access grant that also permits writes. The server's profile
+independently enforces read versus readwrite.
 
 Tool visibility and generic app enums reflect effective grants; every call is still
-checked. Calendar, Notes, and Reminders expose task-specific read tools alongside generic reads.
+checked. Calendar, Notes, Reminders, and Contacts expose task-specific reads.
 Initialization instructions describe workflows and limitations for enabled apps.
 Music `now_playing` is the
 only read-only app action; other actions require `readwrite`. Updates, deletions, and
@@ -59,7 +61,7 @@ against concurrent filesystem changes by other local processes.
 | `policy/policy.ts` | Effective permission snapshot and per-call authorization |
 | `tools/system-tools.ts` | Health and permission inspection |
 | `tools/crud-tools.ts` | Generic app operations, validation, confirmation |
-| `tools/app-read-tools.ts` | Discoverable Calendar, Notes, and Reminders reads |
+| `tools/app-read-tools.ts` | Discoverable app-specific reads |
 | `mode/confirmation.ts` | User confirmation via form elicitation only |
 | `adapters/` | ResourceAdapter implementations and app-specific validation |
 | `templates/` | Internal parameterized AppleScript builders and escaping |

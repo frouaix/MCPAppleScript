@@ -260,7 +260,15 @@ func execute(_ request: Request, store: EKEventStore) throws -> Any {
 struct CalendarBridge {
     static func main() async {
         do {
-            let request = try JSONDecoder().decode(Request.self, from: FileHandle.standardInput.readDataToEndOfFile())
+            let input = FileHandle.standardInput.readDataToEndOfFile()
+            let request = try JSONDecoder().decode(Request.self, from: input)
+            if request.operation.hasPrefix("contacts.") {
+                let contactRequest = try JSONDecoder().decode(ContactsRequest.self, from: input)
+                let result = try await executeContactsRequest(contactRequest)
+                let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed])
+                FileHandle.standardOutput.write(data)
+                return
+            }
             if request.operation.hasPrefix("reminders.") {
                 let result = try await executeRemindersRequest(request)
                 let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed])

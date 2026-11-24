@@ -1,4 +1,5 @@
 import Foundation
+import Contacts
 
 @main
 struct CalendarBridgeTests {
@@ -75,6 +76,39 @@ struct CalendarBridgeTests {
         do {
             try validateReminderRequest(badReminder)
             fatalError("Empty reminder update accepted")
+        } catch { }
+
+        let contactRequest = try JSONDecoder().decode(ContactsRequest.self, from: Data("""
+        {"operation":"contacts.create_person","firstName":"Example","lastName":"Person",
+         "emails":[{"label":"work","value":"one@example.test"},{"label":null,"value":"two@example.test"}],
+         "phones":[{"label":"mobile","value":"123456"}]}
+        """.utf8))
+        try validateContactsRequest(contactRequest)
+        let contact = CNMutableContact()
+        applyContactChanges(contactRequest, to: contact)
+        precondition(contactMatchesQuery(contact, query: "EXAMPLE"))
+        precondition(contactMatchesQuery(contact, query: "two@example"))
+        precondition(contactMatchesQuery(contact, query: "123"))
+        precondition(!contactMatchesQuery(contact, query: "not-present"))
+        let detail = contactDetails(contact)
+        let contactJson = try JSONSerialization.data(withJSONObject: detail)
+        let decodedContact = try JSONSerialization.jsonObject(with: contactJson) as! [String: Any]
+        let contactProperties = decodedContact["properties"] as! [String: Any]
+        precondition(decodedContact["name"] as? String == "Example Person")
+        precondition((contactProperties["emails"] as? [[String: Any]])?.count == 2)
+        precondition((contactProperties["phones"] as? [[String: Any]])?.count == 1)
+        let update = try JSONDecoder().decode(ContactsRequest.self, from: Data("""
+        {"operation":"contacts.update_person","personId":"fixture","firstName":"Updated"}
+        """.utf8))
+        try validateContactsRequest(update)
+        applyContactChanges(update, to: contact)
+        precondition(contact.givenName == "Updated" && contact.emailAddresses.count == 2)
+        let invalidContact = try JSONDecoder().decode(ContactsRequest.self, from: Data("""
+        {"operation":"contacts.update_person","personId":"fixture"}
+        """.utf8))
+        do {
+            try validateContactsRequest(invalidContact)
+            fatalError("Empty contact update accepted")
         } catch { }
     }
 }

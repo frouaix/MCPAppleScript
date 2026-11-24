@@ -42,7 +42,7 @@ applescript-mcp/
       tsconfig.json
       eslint.config.js
       .prettierrc
-      native/                 # Swift EventKit/AppKit helper and build script
+      native/                 # Swift native helper and build script
 
       src/
         index.ts              # Stdio entrypoint
@@ -73,7 +73,6 @@ applescript-mcp/
           escape.ts           # esc(), wrapScript(), jsonEscHandlers
           notes.ts
           mail.ts
-          contacts.ts
           messages.ts
           photos.ts
           music.ts

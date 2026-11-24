@@ -13,7 +13,7 @@ See [configuration and profile examples](../README.md#permissions-and-named-prof
 | `app.list_containers` | `read` | None |
 | `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset`; Calendar requires `startDate` and `endDate` |
 | `app.get` | `read` | `id` |
-| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate`; Calendar and Reminders accept `offset` |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate`; Calendar, Reminders, and Contacts accept `offset` |
 | `app.create` | `readwrite` | `properties`, optional `containerId` |
 | `app.update` | `readwrite` + confirmation | `id`, `properties` |
 | `app.delete` | `readwrite` + confirmation | `id` |
@@ -51,6 +51,8 @@ the generic operations' policy checks, adapters, validation, and executor. They 
 | `notes.search_notes` | `query`; optional `folderId`, `limit` | Matching IDs, titles, modification dates; searches title or plain-text body |
 | `notes.get_note` | `noteId` from list/search | Full note including `properties.body`, creation/modification dates |
 | `reminders.list_due` | Optional `day: "today" \| "tomorrow"` (default today), `listId`, `limit`, `offset` | Incomplete reminders due on the selected local day, ordered by due date |
+| `contacts.search` | `query`; optional `groupId`, `limit`, `offset` | Matching contact IDs and names |
+| `contacts.get` | `contactId` from search | Contact details |
 
 List page size defaults to 50; Notes search defaults to 20. Both accept 1-200.
 List offsets start at 0. Notes search returns a limited array, not a complete paginated
@@ -101,7 +103,7 @@ EventKit may expose fewer calendars than the Calendar app; compare
 Updates and deletions affect the selected occurrence, not future occurrences.
 Calendar `app.search` matches event titles in the required date range and returns
 the same paginated shape; advance its `offset` by the returned item count while
-`hasMore` is true. Other app searches except Reminders remain limited, unpaginated results.
+`hasMore` is true. Searches outside Calendar, Reminders, and Contacts are unpaginated.
 Calendar `app.get` retains `properties.startDate`, `properties.endDate`,
 `properties.location`, `properties.allDay`, and `properties.description` alongside
 the top-level event fields. Calendar creation takes a Calendar ID as `containerId`
@@ -126,6 +128,17 @@ reminders. Completed and overdue reminders are excluded; an empty result is vali
 Results include `total`, `offset`, `hasMore`, local `timeZone`, and range bounds.
 EventKit's representation of recurring reminders and available lists can differ from
 the Reminders app; compare results before treating them as exhaustive.
+
+### Contacts
+
+Contacts requires its own macOS Contacts grant, which permits writes even for an MCP
+read-only profile. Search matches names, organizations, emails, and phone numbers.
+List and search return `total`, `offset`, `hasMore`, and `items`; get returns labeled
+`emails` and `phones`. Contact notes are not available without Apple's restricted entitlement.
+Create/update accept `firstName`, `lastName`, `organization`, `jobTitle`, `emails`, and
+`phones`; each email or phone is `{"label":null,"value":"..."}`. Updating an array
+replaces that entire array. Create requires a name or organization; optional `containerId`
+is a group ID from `app.list_containers`.
 
 Initialization instructions describe enabled apps and suggested workflows; tool
 descriptions and schemas provide the same discovery hints for clients that ignore
@@ -158,9 +171,9 @@ supports it. Bundle IDs are internal; configuration and tool inputs use short na
 4. The adapter maps to a known template.
 5. Updates, deletions, and `send`/`move`/`do_javascript` actions require MCP form
    elicitation. Missing support, rejection, or cancellation prevents execution.
-6. Calendar and Reminders use the EventKit helper (AppKit for `show`); other apps use
+6. Calendar, Reminders, and Contacts use the native helper; other apps use
    parameterized AppleScript via `osascript`. Each has an execution timeout.
-7. macOS independently enforces Calendar/Reminders Full Access or Automation consent.
+7. macOS independently enforces app access or Automation consent.
 
 Use `finder.allowedPaths` to restrict filesystem scope and `safari.doJavaScript` to
 opt into JavaScript. Neither option grants app access by itself.

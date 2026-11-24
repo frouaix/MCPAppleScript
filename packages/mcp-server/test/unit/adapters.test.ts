@@ -238,6 +238,28 @@ describe("ContactsAdapter", () => {
     assert.equal(result.templateId, "contacts.search_people");
     assert.equal(result.parameters.query, "Smith");
   });
+
+  it("validates contact writes and keeps the selected ID", () => {
+    assert.throws(() => adapter.create({ properties: {} }));
+    assert.throws(() => adapter.create({ properties: { firstName: " ", organization: "" } }));
+    assert.throws(() => adapter.create({ properties: { firstName: "Test", note: "unsupported" } }));
+    assert.throws(() => adapter.update({ id: "original", properties: { personId: "other" } }));
+    assert.throws(() => adapter.update({ id: "original", properties: {} }));
+    assert.throws(() =>
+      adapter.update({ id: "original", properties: { emails: [{ value: "" }] } })
+    );
+    assert.throws(() => adapter.search({ query: "" }));
+    const result = adapter.update({ id: "original", properties: { phones: [] } });
+    assert.equal(result.parameters.personId, "original");
+    assert.deepEqual(result.parameters.phones, []);
+  });
+
+  it("passes group and pagination to native search", () => {
+    const result = adapter.search({ query: "Smith", containerId: "group", limit: 3, offset: 4 });
+    assert.equal(result.parameters.groupId, "group");
+    assert.equal(result.parameters.limit, 3);
+    assert.equal(result.parameters.offset, 4);
+  });
 });
 
 describe("MessagesAdapter", () => {

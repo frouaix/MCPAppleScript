@@ -17,6 +17,35 @@ const helper = fileURLToPath(
 
 describe("EventKit dispatch", () => {
   for (const operation of [
+    "list_groups",
+    "list_people",
+    "get_person",
+    "search_people",
+    "create_person",
+    "update_person",
+    "delete_person",
+    "show",
+  ]) {
+    it(`plans contacts.${operation} without accessing Contacts`, async () => {
+      const response = await runExecutor(
+        {
+          requestId: "test",
+          bundleId: "com.apple.Contacts",
+          mode: "template",
+          templateId: `contacts.${operation}`,
+          parameters: {},
+          timeoutMs: 10000,
+          dryRun: true,
+        },
+        { logger }
+      );
+      assert.ok(response.ok);
+      assert.equal(response.result.backend, "Contacts");
+      assert.equal(response.result.operation, `contacts.${operation}`);
+    });
+  }
+
+  for (const operation of [
     "list_lists",
     "list_reminders",
     "list_due",
@@ -142,6 +171,31 @@ describe("EventKit dispatch", () => {
   );
 
   it(
+    "rejects invalid Contacts requests before requesting access",
+    { skip: process.platform !== "darwin" || !existsSync(helper) },
+    async () => {
+      for (const [templateId, parameters, message] of [
+        ["contacts.get_person", {}, /Contact ID is required/],
+        ["contacts.create_person", {}, /name, last name, or organization is required/],
+      ] as const) {
+        const response = await runExecutor(
+          {
+            requestId: "test",
+            bundleId: "com.apple.Contacts",
+            mode: "template",
+            templateId,
+            parameters,
+            timeoutMs: 10000,
+          },
+          { logger }
+        );
+        assert.equal(response.ok, false);
+        if (!response.ok) assert.match(response.error.message, message);
+      }
+    }
+  );
+
+  it(
     "preserves occurrence IDs and formats local times across daylight saving",
     {
       skip: process.platform !== "darwin",
@@ -158,6 +212,7 @@ describe("EventKit dispatch", () => {
             "CALENDAR_BRIDGE_TEST",
             fileURLToPath(new URL("../../native/CalendarBridge/main.swift", import.meta.url)),
             fileURLToPath(new URL("../../native/CalendarBridge/Reminders.swift", import.meta.url)),
+            fileURLToPath(new URL("../../native/CalendarBridge/Contacts.swift", import.meta.url)),
             fileURLToPath(new URL("../native/CalendarBridgeTests.swift", import.meta.url)),
             "-o",
             binary,
