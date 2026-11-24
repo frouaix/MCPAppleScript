@@ -234,7 +234,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
           .int()
           .min(0)
           .optional()
-          .describe("Calendar only: pagination offset (default: 0)"),
+          .describe("Calendar and Reminders only: pagination offset (default: 0)"),
         startDate: timestamp.optional().describe("Calendar only: inclusive range start"),
         endDate: timestamp.optional().describe("Calendar only: exclusive range end"),
         dryRun: dryRunParam,

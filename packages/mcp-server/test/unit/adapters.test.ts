@@ -132,14 +132,38 @@ describe("RemindersAdapter", () => {
       properties: { name: "Buy milk", priority: 5 },
     });
     assert.equal(result.templateId, "reminders.create_reminder");
-    assert.equal(result.parameters.listName, "Shopping");
+    assert.equal(result.parameters.listId, "Shopping");
     assert.equal(result.parameters.name, "Buy milk");
     assert.equal(result.parameters.priority, 5);
   });
 
   it("action complete works", () => {
-    const result = adapter.action({ action: "complete", parameters: { reminderId: "x" } });
+    const result = adapter.action({
+      action: "complete",
+      parameters: { reminderId: "x", name: "other" },
+    });
     assert.equal(result.templateId, "reminders.complete");
+    assert.deepEqual(result.parameters, { reminderId: "x" });
+  });
+
+  it("validates native reminder writes and preserves the selected ID", () => {
+    assert.throws(() => adapter.create({ properties: {} }));
+    assert.throws(() => adapter.create({ properties: { name: "Test", flagged: true } }));
+    assert.throws(() => adapter.update({ id: "original", properties: { reminderId: "other" } }));
+    assert.throws(() => adapter.update({ id: "original", properties: {} }));
+    assert.throws(() => adapter.update({ id: "original", properties: { dueDate: "2026-02-30" } }));
+    assert.throws(() => adapter.update({ id: "original", properties: { priority: 10 } }));
+    assert.throws(() => adapter.action({ action: "complete", parameters: {} }));
+    const result = adapter.update({ id: "original", properties: { completed: false } });
+    assert.equal(result.parameters.reminderId, "original");
+    assert.equal(result.parameters.completed, false);
+  });
+
+  it("passes search pagination and list ID to EventKit", () => {
+    const result = adapter.search({ query: "milk", containerId: "list-id", limit: 3, offset: 4 });
+    assert.equal(result.parameters.listId, "list-id");
+    assert.equal(result.parameters.limit, 3);
+    assert.equal(result.parameters.offset, 4);
   });
 
   it("action throws for unsupported", () => {

@@ -30,7 +30,7 @@ Run `APPLESCRIPT_E2E=1 pnpm test:integration` locally, with `CI` unset.
 
 These tests grant a dedicated profile read access to all supported apps using temporary
 configuration. Finder gets an explicit home-directory allowlist. Tests read real
-containers, may trigger macOS Automation consent prompts, and assert structured output.
+containers, may trigger macOS consent prompts, and assert structured output.
 They never write app data. Errors are failures rather than accepted substitutes for
 working app communication.
 

@@ -17,6 +17,37 @@ const helper = fileURLToPath(
 
 describe("EventKit dispatch", () => {
   for (const operation of [
+    "list_lists",
+    "list_reminders",
+    "list_due",
+    "get_reminder",
+    "search_reminders",
+    "create_reminder",
+    "update_reminder",
+    "delete_reminder",
+    "complete",
+    "show",
+  ]) {
+    it(`plans reminders.${operation} without accessing Reminders`, async () => {
+      const response = await runExecutor(
+        {
+          requestId: "test",
+          bundleId: "com.apple.reminders",
+          mode: "template",
+          templateId: `reminders.${operation}`,
+          parameters: {},
+          timeoutMs: 10000,
+          dryRun: true,
+        },
+        { logger }
+      );
+      assert.ok(response.ok);
+      assert.equal(response.result.backend, "EventKit");
+      assert.equal(response.result.operation, `reminders.${operation}`);
+    });
+  }
+
+  for (const operation of [
     "list_calendars",
     "list_events",
     "get_event",
@@ -126,13 +157,17 @@ describe("EventKit dispatch", () => {
             "-D",
             "CALENDAR_BRIDGE_TEST",
             fileURLToPath(new URL("../../native/CalendarBridge/main.swift", import.meta.url)),
+            fileURLToPath(new URL("../../native/CalendarBridge/Reminders.swift", import.meta.url)),
             fileURLToPath(new URL("../native/CalendarBridgeTests.swift", import.meta.url)),
             "-o",
             binary,
           ],
           { timeout: 60000 }
         );
-        execFileSync(binary, [], { timeout: 10000 });
+        execFileSync(binary, [], {
+          timeout: 10000,
+          env: { ...process.env, TZ: "America/Los_Angeles" },
+        });
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }

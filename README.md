@@ -13,16 +13,16 @@ A local, **stdio-only** MCP server for controlled automation on macOS.
 
 ```text
 MCP client -> TypeScript server -> osascript -> macOS apps
-                                -> native EventKit helper -> Calendar
+                                -> native EventKit helper -> Calendar / Reminders
 ```
 
 The server validates requests, enforces immutable per-app permissions, maps operations
 through app adapters, and executes parameterized AppleScript or a Swift EventKit helper
-for Calendar. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
+for Calendar and Reminders. There is no HTTP listener, raw-script tool, or arbitrary-template tool.
 
 Adapters exist for Notes, Calendar, Reminders, Mail, Contacts, Messages, Photos, Music,
 Finder, and Safari. Support varies by app; not every app implements every CRUD operation.
-Actual app automation depends on macOS scripting support and Automation consent.
+AppleScript automation depends on macOS scripting support and Automation consent.
 
 ## Installation
 
@@ -64,6 +64,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
     "apps": {
       "notes": "readwrite",
       "calendar": "readwrite",
+      "reminders": "read",
       "mail": "read"
     }
   },
@@ -72,6 +73,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
       "apps": {
         "notes": "read",
         "calendar": "read",
+        "reminders": "read",
         "mail": "read"
       }
     },
@@ -92,7 +94,7 @@ by `APPLESCRIPT_MCP_CONFIG`.
 }
 ```
 
-Use the short app names shown above and `reminders`, `contacts`, `messages`, `photos`,
+Use the short app names shown above and `contacts`, `messages`, `photos`,
 `music`, `finder`, `safari` -- not bundle IDs. Unknown app names and invalid permissions
 are rejected.
 
@@ -148,10 +150,9 @@ macOS may ask permission for the launching application to control a target app.
 Review **System Settings > Privacy & Security > Automation** if access is denied.
 The exact attribution depends on how the client launches the server.
 
-Calendar operations use EventKit and require a separate **Calendars: Full Access**
-grant to the Calendar Bridge. macOS Full Access permits writes at the OS level;
-the MCP server still enforces the selected profile, but that is not protection
-against an agent with unrestricted shell access. Calendar's `show` action uses AppKit.
+Calendar and Reminders use EventKit and require separate macOS **Full Access** grants.
+The attributed app depends on the launcher; for example, macOS may prompt for iTerm.
+Full Access permits writes at the OS level even with an MCP read-only profile.
 
 Updates, deletions, and actions named `send`, `move`, or `do_javascript` require user
 confirmation through MCP **form elicitation**, in addition to `readwrite`.
@@ -183,6 +184,7 @@ been removed because they do not fit scoped stdio access.
 | `applescript.get_permissions` | None; effective grants and selected profile |
 | `calendar.list_calendars`, `calendar.list_events` | Calendar `read`; calendars and date-filtered schedules |
 | `notes.list_folders`, `notes.list_notes`, `notes.search_notes`, `notes.get_note` | Notes `read`; browse, search titles/body, read content |
+| `reminders.list_due` | Reminders `read`; incomplete reminders due today or tomorrow |
 | `app.list_containers`, `app.list`, `app.get`, `app.search` | `read` |
 | `app.create`, `app.update`, `app.delete` | `readwrite` |
 | `app.action` | `readwrite`, except Music `now_playing` requires `read` |
@@ -200,9 +202,9 @@ The Mac resolves local midnight boundaries, filters overlapping events, sorts th
 chronologically, and returns paginated local timestamps with UTC offsets, including
 recurring occurrences. EventKit may expose fewer calendars than Calendar displays;
 compare `calendar.list_calendars` with the app before relying on completeness.
-See [docs/TOOLS.md](docs/TOOLS.md) for
-date ranges, pagination, and Notes examples. Restart the MCP instance after rebuilding
-to refresh the tools advertised to the client.
+For five incomplete reminders due today, use `reminders.list_due` with
+`{"day":"today","limit":5}`. See [docs/TOOLS.md](docs/TOOLS.md) for details.
+Restart the MCP instance after rebuilding to refresh its tools.
 
 ## Development
 
@@ -213,7 +215,7 @@ pnpm test:unit
 pnpm test:integration
 pnpm lint
 
-# Real-app reads: opt in locally; may prompt for Automation consent
+# Real-app reads: opt in locally; may prompt for macOS consent
 APPLESCRIPT_E2E=1 pnpm test:integration
 
 # Run a selected profile

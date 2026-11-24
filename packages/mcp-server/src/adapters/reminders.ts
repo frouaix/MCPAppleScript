@@ -1,16 +1,50 @@
 import {
-  ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  ResourceAdapter,
+  AppInfo,
+  ListParams,
+  SearchParams,
+  CreateParams,
+  UpdateParams,
+  ActionParams,
+  UnsupportedOperationError,
 } from "./types.js";
 import { z } from "zod";
+import { McpAppleScriptError } from "../util/errors.js";
 
-const remindersPropertiesSchema = z.object({
-  name: z.string().optional(),
-  body: z.string().optional(),
-  dueDate: z.string().optional(),
-  priority: z.number().optional(),
-  flagged: z.boolean().optional(),
-}).passthrough();
+const remindersPropertiesSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    body: z.string().optional(),
+    dueDate: z
+      .string()
+      .date()
+      .or(z.string().datetime({ offset: true, precision: 0 }))
+      .optional(),
+    priority: z.number().int().min(0).max(9).optional(),
+    completed: z.boolean().optional(),
+  })
+  .strict();
+
+function validateReminderProperties(
+  properties: Record<string, unknown>,
+  operation: "create" | "update"
+) {
+  const schema =
+    operation === "create"
+      ? remindersPropertiesSchema.extend({ name: z.string().min(1) })
+      : remindersPropertiesSchema.refine(
+          (value) => Object.values(value).some((field) => field !== undefined),
+          "At least one reminder property is required."
+        );
+  const result = schema.safeParse(properties);
+  if (!result.success) {
+    throw new McpAppleScriptError(
+      "INVALID_REQUEST",
+      `Invalid Reminders ${operation}: ${result.error.message}`
+    );
+  }
+  return result.data;
+}
 
 export class RemindersAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -18,8 +52,14 @@ export class RemindersAdapter implements ResourceAdapter {
     displayName: "Apple Reminders",
     bundleId: "com.apple.reminders",
     capabilities: {
-      listContainers: true, list: true, get: true, search: true,
-      create: true, update: true, delete: true, actions: ["show", "complete"],
+      listContainers: true,
+      list: true,
+      get: true,
+      search: true,
+      create: true,
+      update: true,
+      delete: true,
+      actions: ["show", "complete"],
     },
     itemType: "reminder",
     containerType: "list",
@@ -53,30 +93,29 @@ export class RemindersAdapter implements ResourceAdapter {
         query: params.query,
         listId: params.containerId ?? "",
         limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
       },
     };
   }
 
   create(params: CreateParams) {
+    const properties = validateReminderProperties(params.properties, "create");
     return {
       templateId: "reminders.create_reminder",
       parameters: {
-        listName: params.containerId ?? "",
-        name: params.properties.name ?? "",
-        body: params.properties.body ?? "",
-        dueDate: params.properties.dueDate ?? "",
-        priority: params.properties.priority ?? 0,
-        flagged: params.properties.flagged ?? false,
+        listId: params.containerId ?? "",
+        ...properties,
       },
     };
   }
 
   update(params: UpdateParams) {
+    const properties = validateReminderProperties(params.properties, "update");
     return {
       templateId: "reminders.update_reminder",
       parameters: {
+        ...properties,
         reminderId: params.id,
-        ...params.properties,
       },
     };
   }
@@ -90,7 +129,13 @@ export class RemindersAdapter implements ResourceAdapter {
       return { templateId: "reminders.show", parameters: params.parameters };
     }
     if (params.action === "complete") {
-      return { templateId: "reminders.complete", parameters: params.parameters };
+      if (typeof params.parameters.reminderId !== "string" || !params.parameters.reminderId) {
+        throw new McpAppleScriptError("INVALID_REQUEST", "reminderId is required.");
+      }
+      return {
+        templateId: "reminders.complete",
+        parameters: { reminderId: params.parameters.reminderId },
+      };
     }
     throw new UnsupportedOperationError("reminders", params.action);
   }

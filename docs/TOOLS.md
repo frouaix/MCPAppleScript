@@ -13,7 +13,7 @@ See [configuration and profile examples](../README.md#permissions-and-named-prof
 | `app.list_containers` | `read` | None |
 | `app.list` | `read` | Optional `containerId`, `limit` (1-200), `offset`; Calendar requires `startDate` and `endDate` |
 | `app.get` | `read` | `id` |
-| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate` and accepts `offset` |
+| `app.search` | `read` | `query`, optional `containerId`, `limit` (1-200); Calendar requires `startDate` and `endDate`; Calendar and Reminders accept `offset` |
 | `app.create` | `readwrite` | `properties`, optional `containerId` |
 | `app.update` | `readwrite` + confirmation | `id`, `properties` |
 | `app.delete` | `readwrite` + confirmation | `id` |
@@ -50,6 +50,7 @@ the generic operations' policy checks, adapters, validation, and executor. They 
 | `notes.list_notes` | Optional `folderId`, `limit`, `offset` | `total`, `items`: note IDs, titles, modification dates |
 | `notes.search_notes` | `query`; optional `folderId`, `limit` | Matching IDs, titles, modification dates; searches title or plain-text body |
 | `notes.get_note` | `noteId` from list/search | Full note including `properties.body`, creation/modification dates |
+| `reminders.list_due` | Optional `day: "today" \| "tomorrow"` (default today), `listId`, `limit`, `offset` | Incomplete reminders due on the selected local day, ordered by due date |
 
 List page size defaults to 50; Notes search defaults to 20. Both accept 1-200.
 List offsets start at 0. Notes search returns a limited array, not a complete paginated
@@ -100,12 +101,31 @@ EventKit may expose fewer calendars than the Calendar app; compare
 Updates and deletions affect the selected occurrence, not future occurrences.
 Calendar `app.search` matches event titles in the required date range and returns
 the same paginated shape; advance its `offset` by the returned item count while
-`hasMore` is true. Other app searches remain limited, unpaginated results.
+`hasMore` is true. Other app searches except Reminders remain limited, unpaginated results.
 Calendar `app.get` retains `properties.startDate`, `properties.endDate`,
 `properties.location`, `properties.allDay`, and `properties.description` alongside
 the top-level event fields. Calendar creation takes a Calendar ID as `containerId`
 (omitting it uses the default calendar); event times need seconds and a UTC offset.
 Invalid create fields and empty updates are rejected before confirmation or dry runs.
+
+### Reminders
+
+Reminders use EventKit and require a separate macOS Reminders Full Access grant.
+The app attributed by macOS depends on the launcher. Full Access permits writes at
+the OS level even for an MCP read-only profile. Obtain EventKit IDs using
+`app.list_containers` and `app.list`. List and search return `total`, `offset`,
+`hasMore`, and `items`; search matches titles and honors `containerId` and `offset`.
+Create and update accept `name`, `body`, `priority` (0-9), `completed`, and `dueDate`
+(a `YYYY-MM-DD` date or ISO timestamp with seconds and UTC offset). Creation requires
+`name`, and `containerId` is a list ID; omit it for the default list. EventKit does not
+expose the Reminders flag, so `flagged` is not supported. IDs may change after syncing.
+
+For five reminders due today, call `reminders.list_due` with `{"day":"today","limit":5}`.
+The day runs from local midnight to the next local midnight, including date-only
+reminders. Completed and overdue reminders are excluded; an empty result is valid.
+Results include `total`, `offset`, `hasMore`, local `timeZone`, and range bounds.
+EventKit's representation of recurring reminders and available lists can differ from
+the Reminders app; compare results before treating them as exhaustive.
 
 Initialization instructions describe enabled apps and suggested workflows; tool
 descriptions and schemas provide the same discovery hints for clients that ignore
@@ -136,11 +156,11 @@ supports it. Bundle IDs are internal; configuration and tool inputs use short na
 3. Adapter validation applies additional restrictions, including Finder path allowlists
    and Safari JavaScript opt-in.
 4. The adapter maps to a known template.
-5. Real consequential writes require MCP form elicitation. Missing support, rejection,
-   or cancellation prevents execution. Tokens cannot substitute for user confirmation.
-6. Calendar operations use the EventKit helper (AppKit for `show`); other apps use
+5. Updates, deletions, and `send`/`move`/`do_javascript` actions require MCP form
+   elicitation. Missing support, rejection, or cancellation prevents execution.
+6. Calendar and Reminders use the EventKit helper (AppKit for `show`); other apps use
    parameterized AppleScript via `osascript`. Each has an execution timeout.
-7. macOS independently enforces Calendar Full Access or Automation consent.
+7. macOS independently enforces Calendar/Reminders Full Access or Automation consent.
 
 Use `finder.allowedPaths` to restrict filesystem scope and `safari.doJavaScript` to
 opt into JavaScript. Neither option grants app access by itself.

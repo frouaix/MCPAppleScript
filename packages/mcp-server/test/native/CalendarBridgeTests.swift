@@ -37,5 +37,44 @@ struct CalendarBridgeTests {
             try validate(invalid)
             fatalError("Invalid event ID accepted")
         } catch { }
+
+        let allDay = try reminderDueDate("2026-11-24")
+        precondition(allDay.year == 2026 && allDay.month == 11 && allDay.day == 24 && allDay.hour == nil)
+        let timed = try reminderDueDate("2026-11-24T10:30:00-08:00")
+        precondition(timed.date == formatter.date(from: "2026-11-24T18:30:00Z"))
+        precondition(TimeZone.current.secondsFromGMT(for: formatter.date(from: "2026-11-01T08:30:00Z")!) == -7 * 3600)
+        let firstFallHour = try reminderDueDate("2026-11-01T01:30:00-07:00")
+        let secondFallHour = try reminderDueDate("2026-11-01T01:30:00-08:00")
+        precondition(firstFallHour.date == formatter.date(from: "2026-11-01T08:30:00Z"))
+        precondition(secondFallHour.date == formatter.date(from: "2026-11-01T09:30:00Z"))
+        var localCalendar = Calendar(identifier: .gregorian)
+        localCalendar.timeZone = .current
+        let dayStart = localCalendar.startOfDay(for: try reminderDueInstant(allDay)!)
+        let nextDay = localCalendar.date(byAdding: .day, value: 1, to: dayStart)!
+        let matchesToday = try reminderMatchesDueRange(allDay, completed: false, start: dayStart, end: nextDay)
+        let completedMatches = try reminderMatchesDueRange(allDay, completed: true, start: dayStart, end: nextDay)
+        let missingMatches = try reminderMatchesDueRange(nil, completed: false, start: dayStart, end: nextDay)
+        precondition(matchesToday && !completedMatches && !missingMatches)
+        let nextDayComponents = localCalendar.dateComponents([.year, .month, .day, .hour, .minute], from: nextDay)
+        let nextMatches = try reminderMatchesDueRange(nextDayComponents, completed: false, start: dayStart, end: nextDay)
+        precondition(!nextMatches)
+        let beforeDay = localCalendar.dateComponents([.year, .month, .day, .hour, .minute], from: dayStart.addingTimeInterval(-60))
+        let beforeMatches = try reminderMatchesDueRange(beforeDay, completed: false, start: dayStart, end: nextDay)
+        precondition(!beforeMatches)
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var timedToday = utcCalendar.dateComponents([.year, .month, .day, .hour, .minute], from: dayStart.addingTimeInterval(36000))
+        timedToday.timeZone = utcCalendar.timeZone
+        let timedMatches = try reminderMatchesDueRange(timedToday, completed: false, start: dayStart, end: nextDay)
+        precondition(timedMatches)
+        do {
+            _ = try reminderDueDate("2026-02-30")
+            fatalError("Invalid due date accepted")
+        } catch { }
+        let badReminder = try JSONDecoder().decode(Request.self, from: Data("{\"operation\":\"reminders.update_reminder\",\"reminderId\":\"fixture\"}".utf8))
+        do {
+            try validateReminderRequest(badReminder)
+            fatalError("Empty reminder update accepted")
+        } catch { }
     }
 }

@@ -39,6 +39,7 @@ describe("MCP stdio profile isolation", () => {
         profiles: {
           research: { apps: { notes: "read", music: "read" } },
           private: { apps: { notes: "read", calendar: "read" } },
+          remindersRead: { apps: { reminders: "read" } },
           disabled: {},
           organizer: { default: "readwrite" },
         },
@@ -229,10 +230,65 @@ describe("MCP stdio profile isolation", () => {
           name,
           arguments: { app: "calendar", id: "fixture", properties, dryRun },
         });
+
         assert.equal(result.isError, true);
         assert.match(JSON.stringify(result.content), /Invalid Calendar/);
         assert.doesNotMatch(JSON.stringify(result.content), /does not support it/);
       }
+    }
+  });
+
+  it("uses EventKit for Reminders while enforcing read-only profiles", async () => {
+    const organizer = await connect("organizer");
+    const reader = await connect("remindersRead");
+    const due = await reader.callTool({
+      name: "reminders.list_due",
+      arguments: { day: "today", limit: 5, dryRun: true },
+    });
+    assert.ok(!due.isError);
+    assert.match(JSON.stringify(due.content), /reminders.list_due/);
+    const disabled = await connect("private");
+    assert.ok(
+      !(await disabled.listTools()).tools.some((tool) => tool.name === "reminders.list_due")
+    );
+    for (const [name, args] of [
+      ["app.list_containers", {}],
+      ["app.list", { containerId: "list-id" }],
+      ["app.search", { query: "test", containerId: "list-id", offset: 2 }],
+      ["app.get", { id: "fixture" }],
+      ["app.create", { properties: { name: "fixture" } }],
+      ["app.update", { id: "fixture", properties: { completed: true } }],
+      ["app.delete", { id: "fixture" }],
+      ["app.action", { action: "complete", parameters: { reminderId: "fixture" } }],
+    ] as const) {
+      const result = await organizer.callTool({
+        name,
+        arguments: { app: "reminders", ...args, dryRun: true },
+      });
+      assert.ok(!result.isError, `${name}: ${JSON.stringify(result.content)}`);
+      assert.match(JSON.stringify(result.content), /EventKit/);
+    }
+    for (const name of ["app.create", "app.update", "app.delete", "app.action"]) {
+      const result = await reader.callTool({
+        name,
+        arguments: {
+          app: "reminders",
+          id: "fixture",
+          properties: { name: "fixture" },
+          action: "complete",
+          parameters: { reminderId: "fixture" },
+          dryRun: true,
+        },
+      });
+      assert.equal(result.isError, true);
+    }
+    for (const dryRun of [false, true]) {
+      const result = await organizer.callTool({
+        name: "app.update",
+        arguments: { app: "reminders", id: "fixture", properties: { flagged: true }, dryRun },
+      });
+      assert.equal(result.isError, true);
+      assert.match(JSON.stringify(result.content), /flagged/);
     }
   });
 

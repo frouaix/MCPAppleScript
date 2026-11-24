@@ -13,7 +13,7 @@ const id = z.string().min(1).max(500);
 export function registerAppReadTools(deps: CrudToolDeps): void {
   const { server, registerTool, policy, appRegistry, executeTemplate, validationContext } = deps;
   function execute(
-    app: "calendar" | "notes",
+    app: "calendar" | "notes" | "reminders",
     operation: string,
     params: Record<string, unknown>,
     mapped: () => { templateId: string; parameters: Record<string, unknown> }
@@ -24,6 +24,34 @@ export function registerAppReadTools(deps: CrudToolDeps): void {
     if (error) return Promise.resolve(error);
     const { templateId, parameters } = mapped();
     return executeTemplate(templateId, adapter.info.bundleId, parameters, params.dryRun === true);
+  }
+
+  if (policy.getPermissions().reminders !== "off") {
+    registerTool(
+      "reminders.list_due",
+      server.tool(
+        "reminders.list_due",
+        "List incomplete reminders due today or tomorrow in the Mac's local time zone, including date-only reminders. Excludes overdue and completed reminders. Results are ordered by due date and paginated.",
+        {
+          day: z.enum(["today", "tomorrow"]).optional().describe("Local day; defaults to today"),
+          listId: id.optional().describe("List ID from app.list_containers; omit for all lists"),
+          limit,
+          offset,
+          dryRun,
+        },
+        { readOnlyHint: true },
+        (params) =>
+          execute("reminders", "app.list", params, () => ({
+            templateId: "reminders.list_due",
+            parameters: {
+              listId: params.listId ?? "",
+              limit: params.limit ?? 50,
+              offset: params.offset ?? 0,
+              ...resolveEventRange({ day: params.day ?? "today" }),
+            },
+          }))
+      )
+    );
   }
 
   if (policy.getPermissions().calendar !== "off") {

@@ -4,7 +4,12 @@ import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { AppRegistry, CalendarAdapter, NotesAdapter } from "../../src/adapters/index.js";
+import {
+  AppRegistry,
+  CalendarAdapter,
+  NotesAdapter,
+  RemindersAdapter,
+} from "../../src/adapters/index.js";
 import { ConfigSchema } from "../../src/config/schema.js";
 import { PolicyEngine } from "../../src/policy/policy.js";
 import { Logger } from "../../src/util/logging.js";
@@ -91,6 +96,7 @@ describe("App-specific read dispatch", () => {
     const appRegistry = new AppRegistry();
     appRegistry.register(new NotesAdapter());
     appRegistry.register(new CalendarAdapter());
+    appRegistry.register(new RemindersAdapter());
     const calls: Array<{
       templateId: string;
       bundleId: string;
@@ -102,7 +108,7 @@ describe("App-specific read dispatch", () => {
       appRegistry,
       policy: new PolicyEngine(
         ConfigSchema.parse({
-          permissions: { apps: { notes: "read", calendar: "read" } },
+          permissions: { apps: { notes: "read", calendar: "read", reminders: "read" } },
         }),
         new Logger({ level: "error", redact: [] })
       ),
@@ -147,6 +153,20 @@ describe("App-specific read dispatch", () => {
       assert.equal(calls.at(-1)?.parameters.calendarId, "cal");
       assert.equal(calls.at(-1)?.parameters.startDate, "2026-11-02T08:00:00Z");
       assert.equal(calls.at(-1)?.parameters.offset, 3);
+      const due = await client.callTool({
+        name: "reminders.list_due",
+        arguments: { day: "today", listId: "list", limit: 5, offset: 2 },
+      });
+      assert.ok(!due.isError);
+      assert.equal(calls.at(-1)?.templateId, "reminders.list_due");
+      assert.equal(calls.at(-1)?.bundleId, "com.apple.reminders");
+      assert.equal(calls.at(-1)?.parameters.listId, "list");
+      assert.equal(calls.at(-1)?.parameters.limit, 5);
+      assert.equal(calls.at(-1)?.parameters.offset, 2);
+      assert.equal(
+        calls.at(-1)?.parameters.startDate,
+        resolveEventRange({ day: "today" }).startDate
+      );
     } finally {
       await client.close();
       await server.close();
