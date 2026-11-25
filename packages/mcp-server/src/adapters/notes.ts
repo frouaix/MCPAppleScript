@@ -1,14 +1,46 @@
 import {
-  ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  ResourceAdapter,
+  AppInfo,
+  ListParams,
+  SearchParams,
+  CreateParams,
+  UpdateParams,
+  ActionParams,
+  UnsupportedOperationError,
 } from "./types.js";
 import { z } from "zod";
+import { McpAppleScriptError } from "../util/errors.js";
 
-const notesPropertiesSchema = z.object({
-  title: z.string().optional(),
-  body: z.string().optional(),
-  folderId: z.string().optional(),
-}).passthrough();
+const notesPropertiesSchema = z
+  .object({
+    title: z.string().max(500).optional(),
+    name: z.string().max(500).optional(),
+    body: z.string().max(100000).optional(),
+  })
+  .strict();
+
+function validateNotesProperties(
+  properties: Record<string, unknown>,
+  operation: "create" | "update"
+) {
+  const schema =
+    operation === "create"
+      ? notesPropertiesSchema.omit({ name: true })
+      : notesPropertiesSchema
+          .omit({ title: true })
+          .refine(
+            (value) => value.name !== undefined || value.body !== undefined,
+            "At least one note property is required."
+          );
+  const parsed = schema.safeParse(properties);
+  if (!parsed.success) {
+    throw new McpAppleScriptError(
+      "INVALID_REQUEST",
+      `Invalid Notes ${operation}: ${parsed.error.message}`
+    );
+  }
+  return parsed.data;
+}
 
 export class NotesAdapter implements ResourceAdapter {
   readonly info: AppInfo = {
@@ -16,8 +48,14 @@ export class NotesAdapter implements ResourceAdapter {
     displayName: "Apple Notes",
     bundleId: "com.apple.Notes",
     capabilities: {
-      listContainers: true, list: true, get: true, search: true,
-      create: true, update: true, delete: true, actions: ["show"],
+      listContainers: true,
+      list: true,
+      get: true,
+      search: true,
+      create: true,
+      update: true,
+      delete: true,
+      actions: ["show"],
     },
     itemType: "note",
     containerType: "folder",
@@ -56,22 +94,25 @@ export class NotesAdapter implements ResourceAdapter {
   }
 
   create(params: CreateParams) {
+    const properties = validateNotesProperties(params.properties, "create");
     return {
       templateId: "notes.create_note",
       parameters: {
-        title: params.properties.title ?? "Untitled",
-        body: params.properties.body ?? "",
+        title: "title" in properties ? (properties.title ?? "Untitled") : "Untitled",
+        body: properties.body ?? "",
         folderId: params.containerId ?? "",
       },
     };
   }
 
   update(params: UpdateParams) {
+    if (!params.id) throw new McpAppleScriptError("INVALID_REQUEST", "Note ID is required.");
+    const properties = validateNotesProperties(params.properties, "update");
     return {
       templateId: "notes.update_note",
       parameters: {
+        ...properties,
         noteId: params.id,
-        ...params.properties,
       },
     };
   }

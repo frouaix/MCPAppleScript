@@ -3,6 +3,8 @@ import { strict as assert } from "node:assert";
 import { runExecutor } from "../../src/exec/executor.js";
 import { ExecutorRequest } from "../../src/exec/types.js";
 import { Logger } from "../../src/util/logging.js";
+import { jsonEscHandlers } from "../../src/templates/escape.js";
+import { buildTemplateScript } from "../../src/templates/index.js";
 
 const silentLogger = new Logger({ level: "error", redact: [] });
 
@@ -109,5 +111,25 @@ describe("executor", () => {
     if (result.ok) {
       assert.equal(result.result.text, "hello world");
     }
+  });
+
+  it("escapes JSON control characters without losing carriage returns", async () => {
+    const req = makeRequest({
+      mode: "raw",
+      script: `set value to "quote" & quote & (character id 0) & (character id 8) & tab & return & linefeed
+return "{\\"value\\":\\"" & my jsonEsc(value) & "\\"}"
+${jsonEscHandlers}`,
+    });
+    const result = await runExecutor(req, opts);
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.result.value, 'quote"\0\b\t\r\n');
+  });
+
+  it("generates chat details without unsupported message history", () => {
+    const script = buildTemplateScript("messages.get_chat", "com.apple.MobileSMS", {
+      chatId: "test",
+    });
+    assert.doesNotMatch(script, /messages of c|messageCount/);
+    assert.match(script, /participants of c/);
   });
 });

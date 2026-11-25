@@ -8,8 +8,6 @@ export function build(
   switch (templateId) {
     case "messages.list_chats":
       return buildListChats(bundleId);
-    case "messages.list_messages":
-      return buildListMessages(bundleId, parameters);
     case "messages.get_chat":
       return buildGetChat(bundleId, parameters);
     case "messages.search_chats":
@@ -45,36 +43,6 @@ function buildListChats(bundleId: string): string {
 end tell`;
 }
 
-function buildListMessages(bundleId: string, parameters: Record<string, unknown>): string {
-  const chatId = (parameters["chatId"] as string | undefined) ?? "";
-  const limit = (parameters["limit"] as number | undefined) ?? 50;
-
-  const targetClause = chatId
-    ? `messages of chat id "${esc(chatId)}"`
-    : "messages";
-
-  return `tell application id "${bundleId}"
-    set allMessages to ${targetClause}
-    set totalCount to count of allMessages
-    set resultCount to totalCount
-    if resultCount > ${limit} then set resultCount to ${limit}
-    set output to "{\\"total\\":" & (totalCount as text) & ",\\"items\\":["
-    repeat with i from 1 to resultCount
-        set m to item i of allMessages
-        set mId to id of m
-        set mSender to ""
-        try
-            set mSender to name of sender of m
-        end try
-        set mDate to date of m as «class isot» as string
-        set output to output & "{\\"id\\":" & mId & ",\\"name\\":\\"message\\",\\"type\\":\\"message\\",\\"properties\\":{\\"sender\\":\\"" & my jsonEsc(mSender) & "\\",\\"date\\":\\"" & my jsonEsc(mDate) & "\\"}}"
-        if i < resultCount then set output to output & ","
-    end repeat
-    set output to output & "]}"
-    return output
-end tell`;
-}
-
 function buildGetChat(bundleId: string, parameters: Record<string, unknown>): string {
   const chatId = parameters["chatId"] as string | undefined;
   if (!chatId) throw new Error("messages.get_chat requires 'chatId' parameter");
@@ -87,8 +55,7 @@ function buildGetChat(bundleId: string, parameters: Record<string, unknown>): st
         if participantNames is not "" then set participantNames to participantNames & ", "
         set participantNames to participantNames & name of p
     end repeat
-    set msgCount to count of messages of c
-    return "{\\"id\\":\\"" & my jsonEsc(cId) & "\\",\\"name\\":\\"" & my jsonEsc(cName) & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & my jsonEsc(participantNames) & "\\",\\"messageCount\\":" & (msgCount as text) & "}}"
+    return "{\\"id\\":\\"" & my jsonEsc(cId) & "\\",\\"name\\":\\"" & my jsonEsc(cName) & "\\",\\"type\\":\\"chat\\",\\"properties\\":{\\"participants\\":\\"" & my jsonEsc(participantNames) & "\\"}}"
 end tell`;
 }
 
@@ -119,13 +86,16 @@ function buildSend(bundleId: string, parameters: Record<string, unknown>): strin
   if (!to) throw new Error("messages.send requires 'to' parameter (phone number or email)");
   const message = parameters["message"] as string | undefined;
   if (!message) throw new Error("messages.send requires 'message' parameter");
-  const service = esc((parameters["service"] as string | undefined) ?? "iMessage");
+  const service = parameters["service"] ?? "iMessage";
+  if (service !== "SMS" && service !== "iMessage") {
+    throw new Error("messages.send service must be iMessage or SMS");
+  }
 
   return `tell application id "${bundleId}"
     set targetService to 1st service whose service type = ${service === "SMS" ? "SMS" : "iMessage"}
     set targetBuddy to buddy "${esc(to)}" of targetService
     send "${esc(message)}" to targetBuddy
-    return "{\\"sent\\":true,\\"to\\":\\"${esc(to)}\\"}"
+    return "{\\"sent\\":true,\\"to\\":\\"" & my jsonEsc("${esc(to)}") & "\\"}"
 end tell`;
 }
 

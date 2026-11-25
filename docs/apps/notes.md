@@ -9,4 +9,6 @@ Uses AppleScript and requires macOS Automation consent.
 - `app.create`, `app.update`, `app.delete`: create, update, or delete a note. Create accepts `title`, `body`, and optional folder `containerId`; update accepts `name` and `body`.
 - `app.action` with `show`: open Notes; optionally supply `parameters.noteId`.
 
+Notes returns plain text on reads but interprets write `body` values as HTML.
+
 **Scenarios:** find a note containing a phrase and read it; create a note in a selected folder.
