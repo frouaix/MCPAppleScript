@@ -15,7 +15,7 @@ export function esc(s: string): string {
  * AppleScript handlers that escape string values for safe JSON embedding.
  * Appended to every template script by wrapScript().
  *
- * `jsonEsc(s)` escapes: \ → \\, " → \", CR → \n, LF → \n, tab → \t
+ * `jsonEsc(s)` escapes quotes, backslashes, and JSON control characters.
  * `replaceText(theString, old, new)` helper for text item delimiter-based replacement.
  */
 export const jsonEscHandlers = `
@@ -24,9 +24,12 @@ on jsonEsc(s)
     set s to s as text
     set s to my replaceText(s, "\\\\", "\\\\\\\\")
     set s to my replaceText(s, "\\"", "\\\\" & quote)
-    set s to my replaceText(s, return, "\\\\n")
-    set s to my replaceText(s, linefeed, "\\\\n")
-    set s to my replaceText(s, tab, "\\\\t")
+    set hexDigits to "0123456789abcdef"
+    repeat with i from 0 to 31
+        set hi to character ((i div 16) + 1) of hexDigits
+        set lo to character ((i mod 16) + 1) of hexDigits
+        set s to my replaceText(s, character id i, "\\\\u00" & hi & lo)
+    end repeat
     return s
 end jsonEsc
 

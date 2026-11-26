@@ -176,7 +176,7 @@ For supported operations and scenarios, see [Calendar](apps/calendar.md),
 | `reminders` | `com.apple.reminders` | reminder | list |
 | `mail` | `com.apple.mail` | message | mailbox |
 | `contacts` | `com.apple.Contacts` | person | group |
-| `messages` | `com.apple.MobileSMS` | message | chat |
+| `messages` | `com.apple.MobileSMS` | chat | chat |
 | `photos` | `com.apple.Photos` | media | album |
 | `music` | `com.apple.Music` | track | playlist |
 | `finder` | `com.apple.finder` | file | folder |

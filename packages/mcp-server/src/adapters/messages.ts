@@ -1,11 +1,27 @@
 import {
-  ResourceAdapter, AppInfo, ListParams, SearchParams,
-  CreateParams, UpdateParams, ActionParams, UnsupportedOperationError,
+  ResourceAdapter,
+  AppInfo,
+  ListParams,
+  SearchParams,
+  CreateParams,
+  UpdateParams,
+  ActionParams,
+  UnsupportedOperationError,
 } from "./types.js";
+import { z } from "zod";
+import { McpAppleScriptError } from "../util/errors.js";
+
+const sendParameters = z
+  .object({
+    to: z.string().min(1).max(500),
+    message: z.string().min(1).max(10000),
+    service: z.enum(["iMessage", "SMS"]).optional(),
+  })
+  .strict();
 
 /**
  * Messages adapter. Apple Messages has a limited AppleScript API:
- * - Read: list chats, list messages in chat, get chat details, search chats
+ * - Read: list, get, and search chats; message history is not exposed
  * - Create: send message (via action)
  * - No update or delete support
  */
@@ -15,10 +31,16 @@ export class MessagesAdapter implements ResourceAdapter {
     displayName: "Apple Messages",
     bundleId: "com.apple.MobileSMS",
     capabilities: {
-      listContainers: true, list: true, get: true, search: true,
-      create: false, update: false, delete: false, actions: ["show", "send"],
+      listContainers: true,
+      list: false,
+      get: true,
+      search: true,
+      create: false,
+      update: false,
+      delete: false,
+      actions: ["show", "send"],
     },
-    itemType: "message",
+    itemType: "chat",
     containerType: "chat",
     requiredValidation: [],
   };
@@ -27,14 +49,8 @@ export class MessagesAdapter implements ResourceAdapter {
     return { templateId: "messages.list_chats", parameters: {} };
   }
 
-  list(params: ListParams) {
-    return {
-      templateId: "messages.list_messages",
-      parameters: {
-        chatId: params.containerId ?? "",
-        limit: params.limit ?? 50,
-      },
-    };
+  list(_params: ListParams): never {
+    throw new UnsupportedOperationError("messages", "list message history");
   }
 
   get(id: string) {
@@ -68,7 +84,14 @@ export class MessagesAdapter implements ResourceAdapter {
       return { templateId: "messages.show", parameters: {} };
     }
     if (params.action === "send") {
-      return { templateId: "messages.send", parameters: params.parameters };
+      const result = sendParameters.safeParse(params.parameters);
+      if (!result.success) {
+        throw new McpAppleScriptError(
+          "INVALID_REQUEST",
+          `Invalid Messages send: ${result.error.message}`
+        );
+      }
+      return { templateId: "messages.send", parameters: result.data };
     }
     throw new UnsupportedOperationError("messages", params.action);
   }

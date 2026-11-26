@@ -142,7 +142,7 @@ export function registerCrudTools(deps: CrudToolDeps): void {
     "app.list",
     server.tool(
       "app.list",
-      "List items (notes, events, reminders, etc.) in an Apple app, optionally within a container. Calendar requires startDate and endDate; alternatively use calendar.list_events.",
+      "List items (notes, events, reminders, etc.) in an Apple app, optionally within a container. Calendar requires startDate and endDate; alternatively use calendar.list_events. Messages history is unavailable; use app.list_containers to list chats.",
       {
         app: appParam,
         containerId: z

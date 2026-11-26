@@ -60,6 +60,19 @@ describe("NotesAdapter", () => {
     assert.equal(result.parameters.name, "New Name");
   });
 
+  it("rejects invalid writes and cannot override the selected note ID", () => {
+    assert.throws(() =>
+      adapter.update({ id: "selected", properties: { noteId: "other", body: "x" } })
+    );
+    assert.throws(() => adapter.update({ id: "selected", properties: {} }));
+    assert.throws(() => adapter.update({ id: "selected", properties: { body: 42 } }));
+    assert.throws(() => adapter.create({ properties: { title: 42 } }));
+    assert.equal(
+      adapter.update({ id: "selected", properties: { body: "x" } }).parameters.noteId,
+      "selected"
+    );
+  });
+
   it("delete returns correct template", () => {
     const result = adapter.delete("note-123");
     assert.equal(result.templateId, "notes.delete_note");
@@ -277,6 +290,11 @@ describe("MessagesAdapter", () => {
     assert.equal(adapter.listContainers().templateId, "messages.list_chats");
   });
 
+  it("does not advertise or implement message history", () => {
+    assert.equal(adapter.info.capabilities.list, false);
+    assert.throws(() => adapter.list({}), /list message history/);
+  });
+
   it("create throws UnsupportedOperationError", () => {
     assert.throws(() => adapter.create({ properties: {} }), UnsupportedOperationError);
   });
@@ -292,6 +310,13 @@ describe("MessagesAdapter", () => {
   it("action send works", () => {
     const result = adapter.action({ action: "send", parameters: { to: "+1234", message: "hi" } });
     assert.equal(result.templateId, "messages.send");
+  });
+
+  it("rejects invalid send parameters instead of silently choosing a service", () => {
+    assert.throws(() => adapter.action({ action: "send", parameters: { to: "+1234" } }));
+    assert.throws(() =>
+      adapter.action({ action: "send", parameters: { to: "+1234", message: "x", service: "RCS" } })
+    );
   });
 });
 
